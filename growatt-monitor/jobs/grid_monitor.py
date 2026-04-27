@@ -12,6 +12,9 @@ def make_grid_monitor(client: GrowattClient, notifier: Notifier):
 
     async def run() -> None:
         data = await client.acall("get_device_status")
+        if data is None:
+            log.info("grid_monitor: device offline, skipping")
+            return
         present = parsers.grid_present(data)
         if present is None:
             log.warning("grid_monitor: could not determine grid state from payload")

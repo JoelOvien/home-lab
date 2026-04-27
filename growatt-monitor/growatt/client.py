@@ -28,6 +28,10 @@ class GrowattAPIError(Exception):
     pass
 
 
+class GrowattDeviceOffline(GrowattAPIError):
+    """Device is not currently reporting to Growatt (e.g. inverter offline)."""
+
+
 class GrowattAuthError(GrowattAPIError):
     """Recoverable auth failure (e.g. session expired)."""
 
@@ -154,6 +158,10 @@ class GrowattClient:
             if self._looks_like_login_page(resp):
                 raise GrowattAuthError(f"Re-login did not restore session for {path}")
 
+        if resp.status_code == 404 and path == DEVICE_DATA_PATH:
+            # Growatt returns 404 on this endpoint when the inverter is not
+            # currently online. Surface it as a distinct, non-failing condition.
+            raise GrowattDeviceOffline(f"{path} HTTP 404 (device offline)")
         if resp.status_code >= 400:
             raise GrowattAPIError(f"{path} HTTP {resp.status_code}")
 
@@ -213,6 +221,11 @@ class GrowattClient:
                     except Exception:
                         log.exception("fatal_auth_callback failed")
                 raise
+            except GrowattDeviceOffline as e:
+                log.info("Growatt %s: %s", fn_name, e)
+                self._consecutive_failures = 0
+                self._unreachable_alerted = False
+                return None
             except GrowattAuthLocked as e:
                 log.warning(
                     "Account locked (attempt %d): %s — sleeping %.0fs",

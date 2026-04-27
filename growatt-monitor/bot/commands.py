@@ -45,9 +45,12 @@ async def _safe_reply(update: Update, text: str) -> None:
         await update.message.reply_text(text)
 
 
-async def _fetch_status() -> dict:
+async def _fetch_status() -> dict | None:
     client = _require_client()
     return await client.acall("get_device_status")
+
+
+OFFLINE_MSG = "📴 Inverter is offline — no live data right now."
 
 
 def _fmt_w(v: float | None) -> str:
@@ -67,6 +70,9 @@ def _fmt_pct(v: float | None) -> str:
 async def cmd_pv(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         data = await _fetch_status()
+        if data is None:
+            await _safe_reply(update, OFFLINE_MSG)
+            return
         await _safe_reply(update, f"☀️ PV output: {_fmt_w(parsers.pv_watts(data))}")
     except Exception:
         log.exception("/pv failed")
@@ -76,6 +82,9 @@ async def cmd_pv(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_load(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         data = await _fetch_status()
+        if data is None:
+            await _safe_reply(update, OFFLINE_MSG)
+            return
         await _safe_reply(update, f"🔋 Load: {_fmt_w(parsers.load_watts(data))}")
     except Exception:
         log.exception("/load failed")
@@ -85,6 +94,9 @@ async def cmd_load(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_battery(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         data = await _fetch_status()
+        if data is None:
+            await _safe_reply(update, OFFLINE_MSG)
+            return
         soc = parsers.battery_soc(data)
         v = parsers.battery_voltage(data)
         await _safe_reply(update, f"🔋 Battery: SOC {_fmt_pct(soc)} | {_fmt_v(v)}")
@@ -96,6 +108,9 @@ async def cmd_battery(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_grid(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         data = await _fetch_status()
+        if data is None:
+            await _safe_reply(update, OFFLINE_MSG)
+            return
         v = parsers.grid_voltage(data)
         present = parsers.grid_present(data)
         state = "ON" if present else ("OFF" if present is False else "unknown")
@@ -108,6 +123,9 @@ async def cmd_grid(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_status(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         data = await _fetch_status()
+        if data is None:
+            await _safe_reply(update, OFFLINE_MSG)
+            return
         pv = parsers.pv_watts(data)
         load = parsers.load_watts(data)
         soc = parsers.battery_soc(data)

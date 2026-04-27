@@ -73,7 +73,7 @@ async def amain() -> None:
     scheduler = Scheduler()
     scheduler.register(
         "grid_monitor",
-        interval_seconds=60,
+        interval_seconds=120,
         fn=make_grid_monitor(client, notifier),
     )
     scheduler.register(
