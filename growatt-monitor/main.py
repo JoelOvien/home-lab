@@ -62,6 +62,13 @@ async def amain() -> None:
         await notifier.send("⚠️ Cannot reach Growatt API. Will keep retrying.")
     client.unreachable_callback = unreachable_alert
 
+    async def fatal_auth_alert(msg: str) -> None:
+        await notifier.send(
+            "🚫 Growatt login rejected (bad credentials). "
+            "Stopping API calls until env vars are fixed and the worker is restarted."
+        )
+    client.fatal_auth_callback = fatal_auth_alert
+
     # ---- Scheduled jobs registry ----
     scheduler = Scheduler()
     scheduler.register(
