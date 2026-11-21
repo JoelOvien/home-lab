@@ -11,6 +11,7 @@ class Config:
     growatt_username: str
     growatt_password: str
     growatt_device_sn: str
+    growatt_plant_id: str
     telegram_token: str
     telegram_chat_id: str
 
@@ -20,6 +21,7 @@ class Config:
             "GROWATT_USERNAME",
             "GROWATT_PASSWORD",
             "GROWATT_DEVICE_SN",
+            "GROWATT_PLANT_ID",
             "TELEGRAM_TOKEN",
             "TELEGRAM_CHAT_ID",
         ]
@@ -32,6 +34,7 @@ class Config:
             growatt_username=os.environ["GROWATT_USERNAME"],
             growatt_password=os.environ["GROWATT_PASSWORD"],
             growatt_device_sn=os.environ["GROWATT_DEVICE_SN"],
+            growatt_plant_id=os.environ["GROWATT_PLANT_ID"],
             telegram_token=os.environ["TELEGRAM_TOKEN"],
             telegram_chat_id=os.environ["TELEGRAM_CHAT_ID"],
         )

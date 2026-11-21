@@ -42,7 +42,12 @@ async def amain() -> None:
         sys.exit(1)
 
     # ---- Growatt ----
-    client = GrowattClient(cfg.growatt_username, cfg.growatt_password, cfg.growatt_device_sn)
+    client = GrowattClient(
+        cfg.growatt_username,
+        cfg.growatt_password,
+        cfg.growatt_device_sn,
+        cfg.growatt_plant_id,
+    )
     bot_commands.bind_client(client)
 
     # ---- Telegram application ----
