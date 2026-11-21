@@ -4,8 +4,9 @@ A Python worker that connects a Growatt SPF inverter (via `server.growatt.com`)
 to a Telegram bot. Provides:
 
 - **Scheduled jobs**: grid on/off alerts with outage duration (every 120s),
-  low-battery alerts (every 5 min), 12-hour energy reports.
-- **On-demand commands**: `/pv`, `/load`, `/battery`, `/grid`, `/status`.
+  low-battery alerts (every 5 min), 12-hour energy reports, and a
+  history recorder that saves a reading every 5 min to SQLite.
+- **On-demand commands**: `/pv`, `/load`, `/battery`, `/grid`, `/status`, `/outages`.
   The bot only answers `TELEGRAM_CHAT_ID`; messages from any other chat are ignored.
 
 Designed to run on Railway as a `worker` process (no HTTP server).
@@ -25,6 +26,7 @@ any are missing.
 | `GROWATT_PLANT_ID`   | Plant ID (`plantId` in dashboard requests, e.g. `10808840`) |
 | `TELEGRAM_TOKEN`     | Bot token from @BotFather                           |
 | `TELEGRAM_CHAT_ID`   | Numeric chat ID for alerts, and the only chat allowed to run commands (use @userinfobot to find)|
+| `HISTORY_DB_PATH` | Optional. SQLite file for history, default `data/history.db`. On Railway, point it at a volume (see below). |
 | `BATTERY_ALERT_LEVELS` | Optional. SOC % levels that trigger a low-battery alert, default `30,15`. A level re-arms once SOC is 5% above it. |
 
 ## Local run
@@ -49,6 +51,17 @@ python main.py
    web service, so **do not** add a public domain.
 4. Open the service → **Variables** → set the six environment variables above.
 5. Deploy. You should see `🟢 Growatt Monitor is online` in your Telegram chat.
+
+### Keeping history across deploys
+
+Railway's filesystem is wiped on every deploy, so without a volume the history
+(snapshots and outage log) starts over each time. To keep it:
+
+1. In the service, **Settings → Volumes → New Volume**, mount path `/data`.
+2. Add the variable `HISTORY_DB_PATH=/data/history.db`.
+
+The 12-hour energy report uses the history once it covers at least half the
+window, and falls back to today's day-chart total until then.
 
 If the bot crashes, Railway will restart the worker; on shutdown it sends
 `🔴 Growatt Monitor is shutting down`. Errors during runtime are logged to

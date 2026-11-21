@@ -24,7 +24,8 @@ python -m pytest tests/test_parsers.py::test_status_fields_from_real_payload   #
 
 Required env vars (startup fails fast if any are missing, see `config.py`):
 `GROWATT_USERNAME`, `GROWATT_PASSWORD`, `GROWATT_DEVICE_SN`, `GROWATT_PLANT_ID`,
-`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`).
+`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`), `HISTORY_DB_PATH`
+(default `data/history.db`; on Railway it must point at a mounted volume).
 Commands only respond to `TELEGRAM_CHAT_ID` (a `filters.Chat` in `main.py`).
 
 No linter or formatter is configured.
@@ -65,6 +66,12 @@ the scheduler side by side until SIGINT/SIGTERM.
 - **`bot/commands.py`**: the `COMMANDS` list is the registry. `main.py` registers
   each entry, and unknown commands get the help listing. The client is injected
   through the module-level `bind_client()`. Handlers reply with `_safe_reply`.
+- **`history.py`**: SQLite store (`snapshots`, `outages`), all timestamps UTC
+  epoch seconds. The `recorder` job writes a snapshot every 5 min.
+  `grid_monitor` opens and closes outage rows and resumes an open one after a
+  restart. `energy_report` integrates snapshots for a rolling 12h, skipping
+  gaps over 15 min, and falls back to the day chart below 50% coverage.
+  `batPower` is stored raw because its sign convention is unverified.
 - **`bot/notifications.py`**: `Notifier.send` plus message formatters.
 
 ## Growatt API notes
@@ -80,8 +87,3 @@ the scheduler side by side until SIGINT/SIGTERM.
   field name, check it against those fixtures and run the tests.
 - Treating an empty `obj` as "device offline" is an assumption that hasn't been
   observed live yet.
-
-## Known drift
-
-- `energy_report` reports today's total from the day chart, not a true rolling
-  12h window. That would need stored history, which doesn't exist yet.

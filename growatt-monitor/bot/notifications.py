@@ -48,3 +48,23 @@ def fmt_energy_report(kwh: float | None) -> str:
     if kwh is None:
         return "📊 Load energy today: no data yet"
     return f"📊 Load energy today so far: {kwh:.2f} kWh"
+
+
+def fmt_rolling_energy(kwh: float, hours: int, covered_seconds: float) -> str:
+    msg = f"📊 Load energy, last {hours}h: {kwh:.2f} kWh"
+    if covered_seconds < hours * 3600 * 0.95:
+        msg += f" (from {fmt_duration(covered_seconds)} of data)"
+    return msg
+
+
+def fmt_outages(outages, now: float) -> str:
+    if not outages:
+        return "🔌 No outages recorded yet."
+    lines = ["🔌 Recent outages:"]
+    for o in outages:
+        ago = fmt_duration(now - o.start_ts)
+        if o.end_ts is None:
+            lines.append(f"• started {ago} ago, still ongoing")
+        else:
+            lines.append(f"• {ago} ago, lasted {fmt_duration(o.end_ts - o.start_ts)}")
+    return "\n".join(lines)

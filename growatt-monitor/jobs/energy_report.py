@@ -3,17 +3,27 @@ from datetime import datetime
 
 from growatt.client import GrowattClient
 from growatt import parsers
-from bot.notifications import Notifier, fmt_energy_report
+from bot.notifications import Notifier, fmt_energy_report, fmt_rolling_energy
 
 log = logging.getLogger(__name__)
 
+# Below this share of the window covered by snapshots, the rolling figure is
+# too partial to trust, so fall back to today's day-chart total.
+MIN_COVERAGE = 0.5
 
-def make_energy_report(client: GrowattClient, notifier: Notifier, hours: int = 12):
+
+def make_energy_report(client: GrowattClient, notifier: Notifier, hours: int = 12, history=None):
+    window = hours * 3600
+
     async def run() -> None:
+        if history is not None:
+            energy = history.load_energy(window)
+            if energy.covered_seconds >= window * MIN_COVERAGE:
+                await notifier.send(fmt_rolling_energy(energy.kwh, hours, energy.covered_seconds))
+                return
+            log.info("energy_report: only %.0fs of history, using day chart", energy.covered_seconds)
         date = datetime.now().strftime("%Y-%m-%d")
         data = await client.acall("get_energy_day_chart", date)
-        # The day chart only covers today. A rolling 12h window needs stored
-        # history (planned snapshot store), so report today's total honestly.
         kwh = parsers.total_load_energy_kwh(data)
         await notifier.send(fmt_energy_report(kwh))
 

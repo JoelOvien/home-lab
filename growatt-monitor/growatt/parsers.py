@@ -54,6 +54,15 @@ def load_watts(payload: dict) -> Optional[float]:
     return _to_float(_obj(payload).get("loadPower"))
 
 
+def grid_watts(payload: dict) -> Optional[float]:
+    return _to_float(_obj(payload).get("gridPower"))
+
+
+def battery_watts(payload: dict) -> Optional[float]:
+    """Raw batPower. The sign convention (charge vs discharge) is unverified."""
+    return _to_float(_obj(payload).get("batPower"))
+
+
 def battery_soc(payload: dict) -> Optional[float]:
     return _to_float(_obj(payload).get("capacity"))
 

@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 
 from growatt.client import GrowattClient
 from growatt import parsers
+from bot.notifications import fmt_outages
 
 log = logging.getLogger(__name__)
 
@@ -29,9 +30,17 @@ class Command:
 _client: GrowattClient | None = None
 
 
+_history = None
+
+
 def bind_client(client: GrowattClient) -> None:
     global _client
     _client = client
+
+
+def bind_history(history) -> None:
+    global _history
+    _history = history
 
 
 def _require_client() -> GrowattClient:
@@ -146,12 +155,24 @@ async def cmd_status(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await _safe_reply(update, "⚠️ Could not reach Growatt API. Try again shortly.")
 
 
+async def cmd_outages(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if _history is None:
+        await _safe_reply(update, "History is not enabled.")
+        return
+    try:
+        await _safe_reply(update, fmt_outages(_history.recent_outages(10), _history.now()))
+    except Exception:
+        log.exception("/outages failed")
+        await _safe_reply(update, "⚠️ Could not read outage history.")
+
+
 COMMANDS: List[Command] = [
     Command("pv",      "Current PV (solar) output in watts",        cmd_pv),
     Command("load",    "Current load consumption in watts",         cmd_load),
     Command("battery", "Battery SOC % and voltage",                 cmd_battery),
     Command("grid",    "Grid voltage and on/off state",             cmd_grid),
     Command("status",  "Full summary",                              cmd_status),
+    Command("outages", "Last 10 grid outages and how long they lasted", cmd_outages),
 ]
 
 

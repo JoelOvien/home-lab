@@ -1,4 +1,5 @@
 import asyncio
+import os
 import logging
 import signal
 import sys
@@ -19,6 +20,8 @@ from scheduler import Scheduler
 from jobs.grid_monitor import make_grid_monitor
 from jobs.energy_report import make_energy_report
 from jobs.battery_monitor import make_battery_monitor
+from jobs.recorder import make_recorder
+from history import History, DEFAULT_PATH
 
 
 def setup_logging() -> None:
@@ -51,6 +54,11 @@ async def amain() -> None:
     )
     bot_commands.bind_client(client)
 
+    history_path = os.environ.get("HISTORY_DB_PATH", DEFAULT_PATH)
+    history = History(history_path)
+    bot_commands.bind_history(history)
+    log.info("History database at %s", history_path)
+
     # ---- Telegram application ----
     application = (
         ApplicationBuilder()
@@ -82,7 +90,7 @@ async def amain() -> None:
     scheduler.register(
         "grid_monitor",
         interval_seconds=120,
-        fn=make_grid_monitor(client, notifier),
+        fn=make_grid_monitor(client, notifier, history),
     )
     scheduler.register(
         "battery_monitor",
@@ -90,9 +98,14 @@ async def amain() -> None:
         fn=make_battery_monitor(client, notifier, cfg.battery_alert_levels),
     )
     scheduler.register(
+        "recorder",
+        interval_seconds=300,
+        fn=make_recorder(client, history),
+    )
+    scheduler.register(
         "energy_report",
         interval_seconds=12 * 3600,
-        fn=make_energy_report(client, notifier, hours=12),
+        fn=make_energy_report(client, notifier, hours=12, history=history),
         run_immediately=False,
     )
 
