@@ -94,7 +94,7 @@ async def cmd_load(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if data is None:
             await _safe_reply(update, OFFLINE_MSG)
             return
-        await _safe_reply(update, f"🔋 Load: {_fmt_w(parsers.load_watts(data))}")
+        await _safe_reply(update, f"⚡ Load: {_fmt_w(parsers.load_watts(data))}")
     except Exception:
         log.exception("/load failed")
         await _safe_reply(update, "⚠️ Could not reach Growatt API. Try again shortly.")
@@ -145,7 +145,7 @@ async def cmd_status(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         msg = (
             "📟 Growatt status\n"
             f"☀️ PV:      {_fmt_w(pv)}\n"
-            f"🔋 Load:    {_fmt_w(load)}\n"
+            f"⚡ Load:    {_fmt_w(load)}\n"
             f"🔋 Battery: {_fmt_pct(soc)} ({_fmt_v(bv)})\n"
             f"🔌 Grid:    {grid_state} ({_fmt_v(gv)})"
         )
