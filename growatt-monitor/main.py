@@ -30,6 +30,8 @@ def setup_logging() -> None:
         datefmt="%Y-%m-%dT%H:%M:%S%z",
         stream=sys.stdout,
     )
+    # httpx logs every request URL at INFO, and Telegram URLs contain the bot token.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 log = logging.getLogger("growatt-monitor")
