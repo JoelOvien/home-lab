@@ -17,11 +17,14 @@ def make_energy_report(client: GrowattClient, notifier: Notifier, hours: int = 1
 
     async def run() -> None:
         if history is not None:
-            energy = history.load_energy(window)
-            if energy.covered_seconds >= window * MIN_COVERAGE:
+            try:
+                energy = await history.load_energy(window)
+            except Exception:
+                log.exception("energy_report: history unavailable, using day chart")
+                energy = None
+            if energy is not None and energy.covered_seconds >= window * MIN_COVERAGE:
                 await notifier.send(fmt_rolling_energy(energy.kwh, hours, energy.covered_seconds))
                 return
-            log.info("energy_report: only %.0fs of history, using day chart", energy.covered_seconds)
         date = datetime.now().strftime("%Y-%m-%d")
         data = await client.acall("get_energy_day_chart", date)
         kwh = parsers.total_load_energy_kwh(data)

@@ -13,15 +13,24 @@ def make_grid_monitor(client: GrowattClient, notifier: Notifier, history=None, c
     # open row in history), so the restore message never guesses a duration.
     state = {"last_present": None, "lost_at": None}
 
-    def resume_from_history(present: bool) -> None:
-        open_ = history.open_outage()
+    async def resume_from_history(present: bool) -> None:
+        open_ = await history.open_outage()
         if open_ is None:
             return
         if present:
-            history.end_outage()
+            await history.end_outage()
             log.info("grid_monitor: closed outage from %s that ended while offline", open_.start_ts)
         else:
             state["lost_at"] = open_.start_ts
+
+    async def record(present: bool) -> None:
+        try:
+            if present:
+                await history.end_outage()
+            else:
+                await history.start_outage()
+        except Exception:
+            log.exception("grid_monitor: could not record outage in history")
 
     async def run() -> None:
         data = await client.acall("get_device_status")
@@ -36,7 +45,10 @@ def make_grid_monitor(client: GrowattClient, notifier: Notifier, history=None, c
         if last is None:
             state["last_present"] = present
             if history is not None:
-                resume_from_history(present)
+                try:
+                    await resume_from_history(present)
+                except Exception:
+                    log.exception("grid_monitor: could not read open outage from history")
             log.info("grid_monitor: initial state present=%s", present)
             return
         if present != last:
@@ -47,13 +59,11 @@ def make_grid_monitor(client: GrowattClient, notifier: Notifier, history=None, c
                 if state["lost_at"] is not None:
                     outage = clock() - state["lost_at"]
                 state["lost_at"] = None
-                if history is not None:
-                    history.end_outage()
             else:
                 state["lost_at"] = clock()
-                if history is not None:
-                    history.start_outage()
-            await notifier.send(fmt_grid_change(present, voltage, outage))
             state["last_present"] = present
+            await notifier.send(fmt_grid_change(present, voltage, outage))
+            if history is not None:
+                await record(present)
 
     return run

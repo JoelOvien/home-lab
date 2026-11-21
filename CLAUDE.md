@@ -24,8 +24,9 @@ python -m pytest tests/test_parsers.py::test_status_fields_from_real_payload   #
 
 Required env vars (startup fails fast if any are missing, see `config.py`):
 `GROWATT_USERNAME`, `GROWATT_PASSWORD`, `GROWATT_DEVICE_SN`, `GROWATT_PLANT_ID`,
-`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`), `HISTORY_DB_PATH`
-(default `data/history.db`; on Railway it must point at a mounted volume).
+`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`); `CLOUDFLARE_ACCOUNT_ID`,
+`CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN` (all three or none) to store
+history in D1; otherwise `HISTORY_DB_PATH` (default `data/history.db`).
 Commands only respond to `TELEGRAM_CHAT_ID` (a `filters.Chat` in `main.py`).
 
 No linter or formatter is configured.
@@ -66,8 +67,12 @@ the scheduler side by side until SIGINT/SIGTERM.
 - **`bot/commands.py`**: the `COMMANDS` list is the registry. `main.py` registers
   each entry, and unknown commands get the help listing. The client is injected
   through the module-level `bind_client()`. Handlers reply with `_safe_reply`.
-- **`history.py`**: SQLite store (`snapshots`, `outages`), all timestamps UTC
-  epoch seconds. The `recorder` job writes a snapshot every 5 min.
+- **`history.py`**: async history store (`snapshots`, `outages`), all
+  timestamps UTC epoch seconds. Two backends with the same SQL: `D1Backend`
+  (Cloudflare D1 HTTP `/query` API, used on Railway) and `LocalBackend`
+  (sqlite3 file). Queries run in a thread so D1's HTTP calls don't block the
+  event loop, and the schema is created lazily on the first successful call.
+  History failures are logged and never block alerts. The `recorder` job writes a snapshot every 5 min.
   `grid_monitor` opens and closes outage rows and resumes an open one after a
   restart. `energy_report` integrates snapshots for a rolling 12h, skipping
   gaps over 15 min, and falls back to the day chart below 50% coverage.

@@ -5,7 +5,8 @@ to a Telegram bot. Provides:
 
 - **Scheduled jobs**: grid on/off alerts with outage duration (every 120s),
   low-battery alerts (every 5 min), 12-hour energy reports, and a
-  history recorder that saves a reading every 5 min to SQLite.
+  history recorder that saves a reading every 5 min to Cloudflare D1
+  (or a local SQLite file when D1 isn't configured).
 - **On-demand commands**: `/pv`, `/load`, `/battery`, `/grid`, `/status`, `/outages`.
   The bot only answers `TELEGRAM_CHAT_ID`; messages from any other chat are ignored.
 
@@ -26,7 +27,10 @@ any are missing.
 | `GROWATT_PLANT_ID`   | Plant ID (`plantId` in dashboard requests, e.g. `10808840`) |
 | `TELEGRAM_TOKEN`     | Bot token from @BotFather                           |
 | `TELEGRAM_CHAT_ID`   | Numeric chat ID for alerts, and the only chat allowed to run commands (use @userinfobot to find)|
-| `HISTORY_DB_PATH` | Optional. SQLite file for history, default `data/history.db`. On Railway, point it at a volume (see below). |
+| `CLOUDFLARE_ACCOUNT_ID` | Optional. Set all three Cloudflare variables to store history in D1 (see below). |
+| `CLOUDFLARE_D1_DATABASE_ID` | Optional. The D1 database ID. |
+| `CLOUDFLARE_API_TOKEN` | Optional. API token with D1 Edit permission. |
+| `HISTORY_DB_PATH` | Optional. Local SQLite file used when D1 isn't configured, default `data/history.db`. |
 | `BATTERY_ALERT_LEVELS` | Optional. SOC % levels that trigger a low-battery alert, default `30,15`. A level re-arms once SOC is 5% above it. |
 
 ## Local run
@@ -52,13 +56,24 @@ python main.py
 4. Open the service → **Variables** → set the six environment variables above.
 5. Deploy. You should see `🟢 Growatt Monitor is online` in your Telegram chat.
 
-### Keeping history across deploys
+### Storing history in Cloudflare D1
 
-Railway's filesystem is wiped on every deploy, so without a volume the history
-(snapshots and outage log) starts over each time. To keep it:
+Railway's filesystem is wiped on every deploy, so on Railway the history
+(snapshots and outage log) should live in Cloudflare D1:
 
-1. In the service, **Settings → Volumes → New Volume**, mount path `/data`.
-2. Add the variable `HISTORY_DB_PATH=/data/history.db`.
+1. In the Cloudflare dashboard, go to **Storage & Databases → D1** and create a
+   database (any name, e.g. `growatt-history`). Copy its **Database ID**.
+2. Copy your **Account ID** (shown on the account home page or in the D1 page's
+   sidebar).
+3. Go to **My Profile → API Tokens → Create Token → Custom token**. Give it one
+   permission, **Account → D1 → Edit**, limited to your account. Copy the token.
+4. In Railway, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID` and
+   `CLOUDFLARE_API_TOKEN`.
+
+The tables are created automatically on the first successful call. If D1 is
+unreachable, that reading or outage row is dropped and logged; alerts still
+go out. Without the Cloudflare variables the bot uses a local SQLite file,
+which is handy for local runs.
 
 The 12-hour energy report uses the history once it covers at least half the
 window, and falls back to today's day-chart total until then.

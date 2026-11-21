@@ -1,5 +1,4 @@
 import asyncio
-import os
 import logging
 import signal
 import sys
@@ -21,7 +20,7 @@ from jobs.grid_monitor import make_grid_monitor
 from jobs.energy_report import make_energy_report
 from jobs.battery_monitor import make_battery_monitor
 from jobs.recorder import make_recorder
-from history import History, DEFAULT_PATH
+from history import History, LocalBackend, D1Backend
 
 
 def setup_logging() -> None:
@@ -54,10 +53,16 @@ async def amain() -> None:
     )
     bot_commands.bind_client(client)
 
-    history_path = os.environ.get("HISTORY_DB_PATH", DEFAULT_PATH)
-    history = History(history_path)
+    if cfg.use_d1:
+        backend = D1Backend(
+            cfg.cloudflare_account_id, cfg.cloudflare_d1_database_id, cfg.cloudflare_api_token
+        )
+        log.info("History stored in Cloudflare D1")
+    else:
+        backend = LocalBackend(cfg.history_db_path)
+        log.info("History stored in local SQLite at %s", cfg.history_db_path)
+    history = History(backend)
     bot_commands.bind_history(history)
-    log.info("History database at %s", history_path)
 
     # ---- Telegram application ----
     application = (

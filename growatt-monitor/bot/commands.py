@@ -160,7 +160,7 @@ async def cmd_outages(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await _safe_reply(update, "History is not enabled.")
         return
     try:
-        await _safe_reply(update, fmt_outages(_history.recent_outages(10), _history.now()))
+        await _safe_reply(update, fmt_outages(await _history.recent_outages(10), _history.now()))
     except Exception:
         log.exception("/outages failed")
         await _safe_reply(update, "⚠️ Could not read outage history.")

@@ -15,6 +15,14 @@ class Config:
     telegram_token: str
     telegram_chat_id: str
     battery_alert_levels: tuple[int, ...] = (30, 15)
+    history_db_path: str = "data/history.db"
+    cloudflare_account_id: str | None = None
+    cloudflare_d1_database_id: str | None = None
+    cloudflare_api_token: str | None = None
+
+    @property
+    def use_d1(self) -> bool:
+        return self.cloudflare_api_token is not None
 
     @staticmethod
     def from_env() -> "Config":
@@ -31,6 +39,13 @@ class Config:
             raise ConfigError(
                 f"Missing required environment variables: {', '.join(missing)}"
             )
+        d1_keys = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_D1_DATABASE_ID", "CLOUDFLARE_API_TOKEN"]
+        d1_set = [k for k in d1_keys if os.environ.get(k)]
+        if d1_set and len(d1_set) != len(d1_keys):
+            missing_d1 = [k for k in d1_keys if k not in d1_set]
+            raise ConfigError(
+                f"D1 history needs all of {', '.join(d1_keys)}; missing {', '.join(missing_d1)}"
+            )
         try:
             int(os.environ["TELEGRAM_CHAT_ID"])
         except ValueError:
@@ -43,6 +58,10 @@ class Config:
             telegram_token=os.environ["TELEGRAM_TOKEN"],
             telegram_chat_id=os.environ["TELEGRAM_CHAT_ID"],
             battery_alert_levels=_parse_levels(os.environ.get("BATTERY_ALERT_LEVELS", "30,15")),
+            history_db_path=os.environ.get("HISTORY_DB_PATH", "data/history.db"),
+            cloudflare_account_id=os.environ.get("CLOUDFLARE_ACCOUNT_ID") or None,
+            cloudflare_d1_database_id=os.environ.get("CLOUDFLARE_D1_DATABASE_ID") or None,
+            cloudflare_api_token=os.environ.get("CLOUDFLARE_API_TOKEN") or None,
         )
 
 
