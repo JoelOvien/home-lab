@@ -4,14 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-`home-lab` is a container for home-lab projects. Currently the only one is
-`growatt-monitor/`: a Python asyncio worker that polls a Growatt SPF 6000 ES PLUS
-inverter through the Growatt web dashboard API and talks to a Telegram bot
-(scheduled alerts plus on-demand commands). It runs on Railway as a `worker`
-process (`Procfile`). There is no HTTP server, so don't add one.
+`home-lab` is a container for home-lab projects:
 
-All commands below run from `growatt-monitor/`. Imports are top-level
-(`from growatt import parsers`), so run things from that directory.
+- `growatt-monitor/`: a Python asyncio worker that polls a Growatt SPF 6000 ES
+  PLUS inverter through the Growatt web dashboard API and talks to a Telegram
+  bot (scheduled alerts plus on-demand commands). It runs on Railway as a
+  `worker` process (`Procfile`). There is no HTTP server, so don't add one.
+- `growatt-widget/`: a macOS WidgetKit widget that reads the worker's D1
+  history. See [macOS widget](#macos-widget) below.
+
+All commands below, up to the widget section, run from `growatt-monitor/`.
+Imports are top-level (`from growatt import parsers`), so run things from that
+directory.
 
 ## Commands
 
@@ -96,3 +100,32 @@ the scheduler side by side until SIGINT/SIGTERM.
   field name, check it against those fixtures and run the tests.
 - Treating an empty `obj` as "device offline" is an assumption that hasn't been
   observed live yet.
+
+## macOS widget
+
+`growatt-widget/` is an Xcode project: a host app (`App/`), a WidgetKit
+extension (`Widget/`), and `Shared/` code compiled into both. It uses
+file-system synchronized groups, so new files in those folders are picked up
+without editing `project.pbxproj`. xcodegen isn't installed; the project file
+is hand-written.
+
+- Data comes from D1 only (latest `snapshots` row plus any open `outages`
+  row) through the same `/query` endpoint as `D1Backend`. It must never call
+  Growatt, because a second login risks the captcha lockout described above.
+  If the snapshot schema changes, update `SnapshotRow` in
+  `Shared/InverterStatus.swift`.
+- Credentials are in `Shared/Secrets.json` (gitignored, D1 Read token),
+  bundled at build time. Both targets are sandboxed, and there's no app group
+  because the project is ad-hoc signed with no team. Each target reads its own
+  bundle and caches in its own `UserDefaults`.
+- Data older than 15 minutes is shown as stale, and nulls render as "n/a".
+  Battery direction isn't shown, for the same `batPower` sign reason as
+  history.
+
+```bash
+cd growatt-widget
+xcodebuild -project GrowattWidget.xcodeproj -scheme GrowattWidget -configuration Release -derivedDataPath build build
+```
+
+`xcodebuild` fails inside the Claude Code sandbox because it can't write its
+build files, so it has to run outside it. There are no tests.
