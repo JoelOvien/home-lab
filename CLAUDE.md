@@ -54,6 +54,10 @@ the scheduler side by side until SIGINT/SIGTERM.
     the correct password, so never add retry loops around login.
   - Session expiry (redirect to login, or login-page HTML) triggers one
     re-login and retry inside `_request`.
+  - Logins go through `_ensure_login`, which holds a lock so concurrent jobs
+    share one login (and one re-login on expiry). A caller that waited while
+    another logged in reuses that result, and after a lockout no call tries
+    to log in for 10 minutes.
 - **`growatt/parsers.py`**: pure functions mapping raw payloads to metrics.
   They return `None` (never `0`) for missing fields. Grid presence is based on
   `vAcInput` against `GRID_DOWN_VOLTAGE` (180 V). Energy is integrated from the

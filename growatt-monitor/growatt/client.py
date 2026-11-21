@@ -2,6 +2,8 @@ import asyncio
 import hashlib
 import logging
 import random
+import threading
+import time
 from typing import Awaitable, Callable, Optional
 
 import requests
@@ -25,6 +27,8 @@ LOGIN_PAGE_MARKERS = ("<title>Login", 'name="account"', "loginAction")
 FATAL_LOGIN_RESULTS = {-2, "-2"}
 # Soft-stop: captcha / rate limit. Back off long, do not blindly re-login.
 LOCKED_LOGIN_RESULTS = {-1, "-1"}
+# After a lockout, no call may try to log in again for this long.
+LOCKOUT_COOLDOWN_SECONDS = 600
 
 
 class GrowattAPIError(Exception):
@@ -72,6 +76,11 @@ class GrowattClient:
             }
         )
         self._logged_in = False
+        # Jobs call in from executor threads at the same time; this keeps it to
+        # one login per session instead of one per job.
+        self._login_lock = threading.Lock()
+        self._login_attempts = 0
+        self._locked_until = 0.0
         self._fatal_auth = False  # latched: stop calling once we know creds are bad
         self._consecutive_failures = 0
         self.unreachable_callback: Optional[Callable[[], Awaitable[None]]] = None
@@ -130,6 +139,32 @@ class GrowattClient:
         self._logged_in = True
         log.info("Growatt login successful")
 
+    def _ensure_login(self, seen_attempts: int) -> None:
+        """Log in, unless another call already tried since `seen_attempts`.
+
+        A caller that waited on the lock while someone else logged in reuses
+        that result, success or failure, rather than making its own attempt.
+        """
+        with self._login_lock:
+            if self._fatal_auth:
+                raise GrowattAuthFatal("Login disabled — credentials previously rejected")
+            if self._login_attempts != seen_attempts:
+                if self._logged_in:
+                    return
+                raise GrowattAuthError("Login attempted by another call and failed")
+            if time.monotonic() < self._locked_until:
+                raise GrowattAuthLocked("Login cooling down after a lockout")
+            self._logged_in = False
+            try:
+                self.login()
+            except GrowattAuthLocked:
+                self._locked_until = time.monotonic() + LOCKOUT_COOLDOWN_SECONDS
+                raise
+            finally:
+                # Bumped only once the attempt is over, so a thread that read
+                # the counter mid-login still sees it change and reuses this.
+                self._login_attempts += 1
+
     # ---------- request with auto re-login ----------
 
     def _looks_like_login_page(self, resp: requests.Response) -> bool:
@@ -145,19 +180,20 @@ class GrowattClient:
     def _request(self, method: str, path: str, **kwargs) -> dict:
         if self._fatal_auth:
             raise GrowattAuthFatal("Skipping request — credentials previously rejected")
+        seen = self._login_attempts
         if not self._logged_in:
-            self.login()
+            self._ensure_login(seen)
 
         url = BASE_URL + path
         kwargs.setdefault("timeout", 20)
         kwargs.setdefault("allow_redirects", False)
 
+        seen = self._login_attempts
         resp = self.session.request(method, url, **kwargs)
 
         if self._looks_like_login_page(resp):
             log.warning("Session expired for %s — re-logging in", path)
-            self._logged_in = False
-            self.login()
+            self._ensure_login(seen)
             resp = self.session.request(method, url, **kwargs)
             if self._looks_like_login_page(resp):
                 raise GrowattAuthError(f"Re-login did not restore session for {path}")
