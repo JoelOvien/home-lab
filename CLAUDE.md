@@ -24,7 +24,8 @@ python -m pytest tests/test_parsers.py::test_status_fields_from_real_payload   #
 
 Required env vars (startup fails fast if any are missing, see `config.py`):
 `GROWATT_USERNAME`, `GROWATT_PASSWORD`, `GROWATT_DEVICE_SN`, `GROWATT_PLANT_ID`,
-`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`.
+`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`).
+Commands only respond to `TELEGRAM_CHAT_ID` (a `filters.Chat` in `main.py`).
 
 No linter or formatter is configured.
 
@@ -82,6 +83,5 @@ the scheduler side by side until SIGINT/SIGTERM.
 
 ## Known drift
 
-- The README says the grid monitor runs every 60s, but `main.py` registers it at 120s.
 - `energy_report` reports today's total from the day chart, not a true rolling
   12h window. That would need stored history, which doesn't exist yet.

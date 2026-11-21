@@ -18,6 +18,7 @@ from bot.notifications import Notifier
 from scheduler import Scheduler
 from jobs.grid_monitor import make_grid_monitor
 from jobs.energy_report import make_energy_report
+from jobs.battery_monitor import make_battery_monitor
 
 
 def setup_logging() -> None:
@@ -57,9 +58,11 @@ async def amain() -> None:
         .build()
     )
 
+    # Updates from any other chat are dropped without a reply.
+    owner_only = filters.Chat(chat_id=int(cfg.telegram_chat_id))
     for cmd in bot_commands.COMMANDS:
-        application.add_handler(CommandHandler(cmd.name, cmd.handler))
-    application.add_handler(MessageHandler(filters.COMMAND, bot_commands.cmd_unknown))
+        application.add_handler(CommandHandler(cmd.name, cmd.handler, filters=owner_only))
+    application.add_handler(MessageHandler(filters.COMMAND & owner_only, bot_commands.cmd_unknown))
 
     notifier = Notifier(application.bot, cfg.telegram_chat_id)
 
@@ -80,6 +83,11 @@ async def amain() -> None:
         "grid_monitor",
         interval_seconds=120,
         fn=make_grid_monitor(client, notifier),
+    )
+    scheduler.register(
+        "battery_monitor",
+        interval_seconds=300,
+        fn=make_battery_monitor(client, notifier, cfg.battery_alert_levels),
     )
     scheduler.register(
         "energy_report",

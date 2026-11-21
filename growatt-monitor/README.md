@@ -3,8 +3,10 @@
 A Python worker that connects a Growatt SPF inverter (via `server.growatt.com`)
 to a Telegram bot. Provides:
 
-- **Scheduled jobs**: grid on/off alerts (every 60s), 12-hour energy reports.
+- **Scheduled jobs**: grid on/off alerts with outage duration (every 120s),
+  low-battery alerts (every 5 min), 12-hour energy reports.
 - **On-demand commands**: `/pv`, `/load`, `/battery`, `/grid`, `/status`.
+  The bot only answers `TELEGRAM_CHAT_ID`; messages from any other chat are ignored.
 
 Designed to run on Railway as a `worker` process (no HTTP server).
 
@@ -22,7 +24,8 @@ any are missing.
 | `GROWATT_DEVICE_SN`  | Device serial number (e.g. `KHM9F990N7`)            |
 | `GROWATT_PLANT_ID`   | Plant ID (`plantId` in dashboard requests, e.g. `10808840`) |
 | `TELEGRAM_TOKEN`     | Bot token from @BotFather                           |
-| `TELEGRAM_CHAT_ID`   | Chat ID to send alerts to (use @userinfobot to find)|
+| `TELEGRAM_CHAT_ID`   | Numeric chat ID for alerts, and the only chat allowed to run commands (use @userinfobot to find)|
+| `BATTERY_ALERT_LEVELS` | Optional. SOC % levels that trigger a low-battery alert, default `30,15`. A level re-arms once SOC is 5% above it. |
 
 ## Local run
 

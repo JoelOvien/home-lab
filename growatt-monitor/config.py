@@ -14,6 +14,7 @@ class Config:
     growatt_plant_id: str
     telegram_token: str
     telegram_chat_id: str
+    battery_alert_levels: tuple[int, ...] = (30, 15)
 
     @staticmethod
     def from_env() -> "Config":
@@ -30,6 +31,10 @@ class Config:
             raise ConfigError(
                 f"Missing required environment variables: {', '.join(missing)}"
             )
+        try:
+            int(os.environ["TELEGRAM_CHAT_ID"])
+        except ValueError:
+            raise ConfigError("TELEGRAM_CHAT_ID must be a numeric chat ID")
         return Config(
             growatt_username=os.environ["GROWATT_USERNAME"],
             growatt_password=os.environ["GROWATT_PASSWORD"],
@@ -37,4 +42,15 @@ class Config:
             growatt_plant_id=os.environ["GROWATT_PLANT_ID"],
             telegram_token=os.environ["TELEGRAM_TOKEN"],
             telegram_chat_id=os.environ["TELEGRAM_CHAT_ID"],
+            battery_alert_levels=_parse_levels(os.environ.get("BATTERY_ALERT_LEVELS", "30,15")),
         )
+
+
+def _parse_levels(raw: str) -> tuple[int, ...]:
+    try:
+        levels = sorted({int(x) for x in raw.split(",") if x.strip()}, reverse=True)
+    except ValueError:
+        raise ConfigError(f"BATTERY_ALERT_LEVELS must be comma-separated integers, got {raw!r}")
+    if any(not 0 < lvl < 100 for lvl in levels):
+        raise ConfigError("BATTERY_ALERT_LEVELS values must be between 1 and 99")
+    return tuple(levels)
