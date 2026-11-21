@@ -20,6 +20,7 @@ any are missing.
 | `GROWATT_USERNAME`   | Growatt portal account                              |
 | `GROWATT_PASSWORD`   | Growatt portal password (sent MD5-hashed)           |
 | `GROWATT_DEVICE_SN`  | Device serial number (e.g. `KHM9F990N7`)            |
+| `GROWATT_PLANT_ID`   | Plant ID (`plantId` in dashboard requests, e.g. `10808840`) |
 | `TELEGRAM_TOKEN`     | Bot token from @BotFather                           |
 | `TELEGRAM_CHAT_ID`   | Chat ID to send alerts to (use @userinfobot to find)|
 
@@ -30,6 +31,7 @@ pip install -r requirements.txt
 export GROWATT_USERNAME=...
 export GROWATT_PASSWORD=...
 export GROWATT_DEVICE_SN=KHM9F990N7
+export GROWATT_PLANT_ID=10808840
 export TELEGRAM_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 python main.py
@@ -42,25 +44,25 @@ python main.py
 3. Railway auto-detects Python via `requirements.txt`. The `Procfile` declares
    a single `worker:` process — Railway will run `python main.py`. There is no
    web service, so **do not** add a public domain.
-4. Open the service → **Variables** → set the five environment variables above.
+4. Open the service → **Variables** → set the six environment variables above.
 5. Deploy. You should see `🟢 Growatt Monitor is online` in your Telegram chat.
 
 If the bot crashes, Railway will restart the worker; on shutdown it sends
 `🔴 Growatt Monitor is shutting down`. Errors during runtime are logged to
 stdout (visible in the Railway logs tab).
 
-## Verifying API field names
+## Growatt endpoints and field names
 
-The exact JSON keys returned by `server.growatt.com` for this account /
-firmware have **not** been verified live — see the TODO comments in
-`growatt/parsers.py`. After first deploy, temporarily add:
+Verified 2026-11-21 against the live web dashboard. The SPF 6000 ES PLUS is
+served by the **storage** panel endpoints, which need `plantId`:
 
-```python
-log.info("status payload: %s", await client.acall("get_device_status"))
-```
+| Purpose | Endpoint | Params |
+|---|---|---|
+| Live status | `POST /panel/storage/getStorageStatusData?plantId=…` | form: `storageSn` |
+| Day chart (5-min samples) | `POST /panel/storage/getStorageEnergyDayChart` | form: `plantId`, `storageSn`, `date` |
 
-near the top of `main.py`, run once, then adjust any parser keys that don't
-match. Remove the log line afterwards.
+`/panel/spf/*` returns 404. Real payloads live in `tests/fixtures/`; run
+`python -m pytest` after changing any parser.
 
 ## Architecture
 

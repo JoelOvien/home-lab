@@ -1,14 +1,11 @@
 """Pure functions that extract metrics from Growatt API JSON responses.
 
-IMPORTANT: The exact JSON key names below are the conventional ones used by
-Growatt's SPF endpoints (cross-referenced from open-source clients like the
-`growattServer` PyPI package), but they have NOT been verified against a live
-response from this specific account / firmware. Every field marked TODO must
-be confirmed by logging a real response and adjusting the key if needed.
+Key names verified 2026-11-21 against live responses from
+/panel/storage/getStorageStatusData and /panel/storage/getStorageEnergyDayChart
+for the SPF 6000 ES PLUS (KHM9F990N7). See tests/fixtures/ for real payloads.
 
-To verify, run once after deployment:
-    log.info("status payload: %s", client.get_device_status())
-and check the actual structure.
+Status payload keys used: ppv1/ppv2 (PV W), vPv1/vPv2 (PV V), loadPower (W),
+capacity (SOC %), vBat (V), vAcInput (grid V), gridPower (W drawn from grid).
 """
 from typing import Any, Optional
 
@@ -37,55 +34,36 @@ def _to_float(v: Any) -> Optional[float]:
 
 
 def pv_watts(payload: dict) -> Optional[float]:
-    # TODO verify key against live response. Common candidates: ppv, pv1Watt+pv2Watt.
     obj = _obj(payload)
-    direct = _to_float(obj.get("ppv"))
-    if direct is not None:
-        return direct
-    p1 = _to_float(obj.get("pv1Watt")) or 0.0
-    p2 = _to_float(obj.get("pv2Watt")) or 0.0
-    total = p1 + p2
-    return total if total > 0 else None
+    p1 = _to_float(obj.get("ppv1"))
+    p2 = _to_float(obj.get("ppv2"))
+    if p1 is None and p2 is None:
+        return _to_float(obj.get("panelPower"))
+    return (p1 or 0.0) + (p2 or 0.0)
+
+
+def pv_voltage(payload: dict) -> Optional[float]:
+    """Highest PV string voltage. The SPF 6000 ES PLUS has one MPPT, so this
+    is effectively vPv1; MPPT only activates around 120V and above."""
+    obj = _obj(payload)
+    values = [v for v in (_to_float(obj.get("vPv1")), _to_float(obj.get("vPv2"))) if v is not None]
+    return max(values) if values else None
 
 
 def load_watts(payload: dict) -> Optional[float]:
-    # TODO verify key. Common candidates: loadPower, pLocalLoad, useWatt.
-    obj = _obj(payload)
-    for k in ("loadPower", "pLocalLoad", "useWatt", "pac_to_user"):
-        v = _to_float(obj.get(k))
-        if v is not None:
-            return v
-    return None
+    return _to_float(_obj(payload).get("loadPower"))
 
 
 def battery_soc(payload: dict) -> Optional[float]:
-    # TODO verify key. Common: capacity, SOC, soc.
-    obj = _obj(payload)
-    for k in ("capacity", "SOC", "soc", "batSoc"):
-        v = _to_float(obj.get(k))
-        if v is not None:
-            return v
-    return None
+    return _to_float(_obj(payload).get("capacity"))
 
 
 def battery_voltage(payload: dict) -> Optional[float]:
-    # TODO verify key. Common: vBat, batVolt.
-    obj = _obj(payload)
-    for k in ("vBat", "batVolt", "batteryVoltage"):
-        v = _to_float(obj.get(k))
-        if v is not None:
-            return v
-    return None
+    return _to_float(_obj(payload).get("vBat"))
 
 
 def grid_voltage(payload: dict) -> Optional[float]:
-    # TODO verify key. Common: vAc1, gridVoltage, vac1.
-    obj = _obj(payload)
-    for k in ("vAc1", "gridVoltage", "vac1", "vGrid"):
-        v = _to_float(obj.get(k))
-        if v is not None:
-            return v
-    return None
+    return _to_float(_obj(payload).get("vAcInput"))
 
 
 def grid_present(payload: dict) -> Optional[bool]:
@@ -95,30 +73,21 @@ def grid_present(payload: dict) -> Optional[bool]:
     return v >= GRID_DOWN_VOLTAGE
 
 
-def total_load_energy_kwh(payload: dict) -> Optional[float]:
-    """Extract cumulative load energy (kWh) from an energy-day chart response.
+# The day chart holds 288 samples (one per 5 minutes) of instantaneous watts.
+SAMPLES_PER_HOUR = 12
 
-    TODO verify shape. The chart endpoint typically returns something like
-    {"obj": {"useEnergy": [...], "charts": {...}}} — we want the sum of the
-    'use'/'load' series, OR the totalizer field if present.
+
+def total_load_energy_kwh(payload: dict) -> Optional[float]:
+    """Load energy (kWh) so far today from an energy-day chart response.
+
+    Integrates charts.userLoad (W, 5-minute samples). Returns None when the
+    chart has no samples yet.
     """
-    obj = _obj(payload)
-    for k in ("eUserToday", "loadEnergyToday", "useEnergyToday"):
-        v = _to_float(obj.get(k))
-        if v is not None:
-            return v
-    # Fallback: sum a series array
-    charts = obj.get("charts") if isinstance(obj.get("charts"), dict) else obj
-    for series_key in ("userLoad", "load", "useEnergy"):
-        series = charts.get(series_key) if isinstance(charts, dict) else None
-        if isinstance(series, list):
-            total = 0.0
-            any_value = False
-            for x in series:
-                f = _to_float(x)
-                if f is not None:
-                    total += f
-                    any_value = True
-            if any_value:
-                return total
-    return None
+    charts = _obj(payload).get("charts")
+    series = charts.get("userLoad") if isinstance(charts, dict) else None
+    if not isinstance(series, list):
+        return None
+    watts = [f for f in (_to_float(x) for x in series) if f is not None]
+    if not watts:
+        return None
+    return sum(watts) / SAMPLES_PER_HOUR / 1000

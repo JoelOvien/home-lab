@@ -12,10 +12,9 @@ def make_energy_report(client: GrowattClient, notifier: Notifier, hours: int = 1
     async def run() -> None:
         date = datetime.now().strftime("%Y-%m-%d")
         data = await client.acall("get_energy_day_chart", date)
-        # NOTE: the day-chart endpoint reports today's totals. For a true rolling
-        # 12h window we'd need to subtract a snapshot from 12h ago — left as a
-        # follow-up. For now we report today's accumulated load energy.
+        # The day chart only covers today. A rolling 12h window needs stored
+        # history (planned snapshot store), so report today's total honestly.
         kwh = parsers.total_load_energy_kwh(data)
-        await notifier.send(fmt_energy_report(kwh, hours))
+        await notifier.send(fmt_energy_report(kwh))
 
     return run

@@ -11,8 +11,11 @@ log = logging.getLogger(__name__)
 # Confirmed from a real browser session: this account lives on openapi.growatt.com.
 BASE_URL = "https://openapi.growatt.com"
 LOGIN_PATH = "/login"
-DEVICE_DATA_PATH = "/panel/spf/getSPFStatusData"
-DEVICE_ENERGY_PATH = "/panel/spf/getSPFEnergyDayChart"
+# Verified 2026-11-21 against the live web dashboard: the SPF 6000 ES PLUS is
+# served by the "storage" panel endpoints (devicePage/storage5000.js), which
+# require plantId as a query param. The /panel/spf/* paths return 404.
+DEVICE_DATA_PATH = "/panel/storage/getStorageStatusData"
+DEVICE_ENERGY_PATH = "/panel/storage/getStorageEnergyDayChart"
 
 LOGIN_PAGE_MARKERS = ("<title>Login", 'name="account"', "loginAction")
 
@@ -48,10 +51,11 @@ class GrowattClient:
     """Sync requests-based Growatt client. Wrap calls with `run_in_executor`
     when invoking from async code (see `acall`)."""
 
-    def __init__(self, username: str, password: str, device_sn: str):
+    def __init__(self, username: str, password: str, device_sn: str, plant_id: str):
         self.username = username
         self.password = password
         self.device_sn = device_sn
+        self.plant_id = plant_id
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -158,10 +162,8 @@ class GrowattClient:
             if self._looks_like_login_page(resp):
                 raise GrowattAuthError(f"Re-login did not restore session for {path}")
 
-        if resp.status_code == 404 and path == DEVICE_DATA_PATH:
-            # Growatt returns 404 on this endpoint when the inverter is not
-            # currently online. Surface it as a distinct, non-failing condition.
-            raise GrowattDeviceOffline(f"{path} HTTP 404 (device offline)")
+        # A 404 means a wrong path, not an offline inverter: let it count as a
+        # failure so the unreachable alert fires instead of masking the bug.
         if resp.status_code >= 400:
             raise GrowattAPIError(f"{path} HTTP {resp.status_code}")
 
@@ -172,21 +174,32 @@ class GrowattClient:
 
     # ---------- public endpoints ----------
 
+    @staticmethod
+    def _check_result(path: str, payload: dict) -> dict:
+        if not isinstance(payload, dict) or payload.get("result") not in (1, "1"):
+            raise GrowattAPIError(f"{path} returned result={payload.get('result') if isinstance(payload, dict) else payload!r}")
+        return payload
+
     def get_device_status(self) -> dict:
-        # TODO confirm payload shape against a real response — see parsers.py.
-        return self._request(
+        payload = self._check_result(DEVICE_DATA_PATH, self._request(
             "POST",
             DEVICE_DATA_PATH,
+            params={"plantId": self.plant_id},
             data={"storageSn": self.device_sn},
-        )
+        ))
+        # Assumption (not yet observed live): an inverter that is not reporting
+        # comes back with an empty obj.
+        if not payload.get("obj"):
+            raise GrowattDeviceOffline(f"{DEVICE_DATA_PATH} returned no live data")
+        return payload
 
     def get_energy_day_chart(self, date: str) -> dict:
         # date format: "YYYY-MM-DD"
-        return self._request(
+        return self._check_result(DEVICE_ENERGY_PATH, self._request(
             "POST",
             DEVICE_ENERGY_PATH,
-            data={"storageSn": self.device_sn, "date": date},
-        )
+            data={"plantId": self.plant_id, "storageSn": self.device_sn, "date": date},
+        ))
 
     # ---------- async wrapper with backoff + alerting ----------
 

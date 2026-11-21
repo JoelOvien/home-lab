@@ -24,7 +24,7 @@ def fmt_grid_change(now_on: bool, voltage: float | None) -> str:
     return f"⚠️ Grid LOST ({v})"
 
 
-def fmt_energy_report(kwh: float | None, hours: int) -> str:
+def fmt_energy_report(kwh: float | None) -> str:
     if kwh is None:
-        return f"📊 Energy report ({hours}h): no data"
-    return f"📊 Load energy in last {hours}h: {kwh:.2f} kWh"
+        return "📊 Load energy today: no data yet"
+    return f"📊 Load energy today so far: {kwh:.2f} kWh"
