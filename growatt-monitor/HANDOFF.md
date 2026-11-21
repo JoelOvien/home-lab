@@ -11,7 +11,7 @@ Use the workflow-orchestrator skill. You're picking up work on `growatt-monitor/
 
 ## State right now
 
-- Branch `fix/storage-endpoints` (commit `110b064`) is pushed and NOT merged. It fixes the bot always replying "Inverter is offline":
+- Live on Railway. Branch `fix/storage-endpoints` (commit `110b064`) is merged to `main` (`39678d2`). It fixes the bot always replying "Inverter is offline":
   - Root cause: `/panel/spf/getSPFStatusData` returns 404 for this account and the client mapped 404 to "offline".
   - Correct endpoints (verified live against the web dashboard on 2026-11-21):
     - `POST /panel/storage/getStorageStatusData?plantId=10808840`, form `storageSn=KHM9F990N7`
@@ -20,7 +20,8 @@ Use the workflow-orchestrator skill. You're picking up work on `growatt-monitor/
   - Real status fields: `vAcInput` (grid V), `ppv1`/`ppv2` (PV W), `vPv1` (PV V), `loadPower`, `capacity` (SOC %), `vBat`, `gridPower`, `status`, `invStatus`. Fixture: `growatt-monitor/tests/fixtures/storage_status.json`.
   - Day chart: `obj.charts.{userLoad, ppv, pacToUser, pacToGrid, sysOut}`, 288 samples of watts at 5-minute intervals (so the datalogger uploads every 5 min; polling faster than that returns duplicates).
   - New required env var `GROWATT_PLANT_ID=10808840`.
-- Still to do before it's live: add `GROWATT_PLANT_ID` in Railway, merge to `main`, confirm `/status` returns real data and the logs show `Growatt login successful`.
+- Done 2026-11-21: `GROWATT_PLANT_ID` added in Railway, merged to `main`, deployed, and the Telegram commands return live data.
+- Railway env var values must be bare, with no quotes or trailing commas. A quoted `TELEGRAM_TOKEN` made the worker crash on startup with `InvalidToken`.
 
 ## Known remaining issues
 
