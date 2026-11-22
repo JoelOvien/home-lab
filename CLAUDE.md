@@ -155,8 +155,8 @@ build files, so it has to run outside it. There are no tests.
 
 ## Flutter app
 
-`growatt-app/` is a Riverpod + GoRouter Flutter app with four tabs (Now,
-Charts, Activity, System). It reads D1 with SELECTs only, through
+`growatt-app/` is a Riverpod + GoRouter Flutter app with five tabs (Now,
+Energy, Charts, Activity, System). It reads D1 with SELECTs only, through
 `lib/core/inverter/inverter_repository.dart`, and must never call Growatt.
 It tolerates the old schema: "no such table/column" errors become empty results.
 
@@ -173,6 +173,19 @@ It tolerates the old schema: "no such table/column" errors become empty results.
   `lib/core/widget/home_widget_sync.dart` saves with `home_widget`. They are
   pushed after each successful Now refresh and by a 15-minute `workmanager`
   task that reads D1 headlessly. There is no iOS widget yet.
+- Theme is Material 3 and matches the home screen widget: Material You
+  dynamic colour via `dynamic_color` (pinned to 1.x, since 2.x needs the
+  separate `material_ui` package), falling back to the baseline purple seed
+  `0xFF6750A4`, and it follows the system light/dark mode. The widget's
+  colours are in `res/values*/widget_colors.xml`. `lib/shared/theme/app_theme.dart`
+  builds `ThemeData` from a `ColorScheme`. `context.colors` is that
+  `ColorScheme`, so use M3 role names (`surfaceContainerHigh`,
+  `onSurfaceVariant`, `secondaryContainer`). `context.status` holds the success
+  and warning roles M3 lacks, harmonised to the primary. `context.typography`
+  gives short names for the M3 text scale. Chart and energy series use the
+  fixed `AppColors.energy*` colours so they read the same on any wallpaper.
+  Use stock M3 widgets (`Card`, `NavigationBar`, `SegmentedButton`) rather
+  than hand-styled ones.
 - The root `.gitignore` ignores `lib/`, so `growatt-app/.gitignore` re-includes it.
 - Flutter writes to its SDK cache, so `flutter` commands fail inside the
   Claude Code sandbox.
