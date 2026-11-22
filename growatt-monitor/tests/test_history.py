@@ -2,9 +2,14 @@ import asyncio
 import pathlib
 import sqlite3
 import sys
+import threading
+
+from zoneinfo import ZoneInfo
 
 import pytest
 import requests
+
+UTC = ZoneInfo("UTC")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
@@ -43,8 +48,13 @@ class FakeD1Session:
         self.db = sqlite3.connect(":memory:", check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.calls = []
+        self.lock = threading.Lock()
 
     def post(self, url, json, timeout):
+        with self.lock:
+            return self._post(url, json)
+
+    def _post(self, url, json):
         self.calls.append((url, json))
         try:
             rows = [dict(r) for r in self.db.execute(json["sql"], json["params"]).fetchall()]
@@ -207,27 +217,52 @@ def test_recorder_writes_snapshot_and_skips_offline(make_store):
 
 
 def test_energy_report_uses_history_or_falls_back(make_store):
+    # 1_000_000 is 1970-01-12 13:46:40 UTC, so midnight UTC was 49_600 s earlier.
     clock = Clock()
     h = make_store(clock)
     client, notifier = FakeClient(), FakeNotifier()
     client.payload = {"result": 1, "obj": {"charts": {"userLoad": [1000] * 12}}}
-    run = make_energy_report(client, notifier, hours=12, history=h)
+    run = make_energy_report(client, notifier, UTC, history=h, clock=clock)
 
     a(run())
     assert notifier.sent[-1] == "📊 Load energy today so far: 1.00 kWh"
 
-    for i in range(12 * 12 + 1):
+    clock.t = 950_400  # local midnight
+    for i in range(12 * 13 + 1):
         if i:
             clock.t += 300
-        a(h.add_snapshot(load_w=500))
+        a(h.add_snapshot(load_w=500, pv_w=200, grid_w=100))
     a(run())
-    assert notifier.sent[-1] == "📊 Load energy, last 12h: 6.00 kWh"
+    assert notifier.sent[-1].splitlines()[:4] == [
+        "📊 Energy today",
+        "⚡ Used:       6.50 kWh",
+        "☀️ Solar made: 2.60 kWh",
+        "🔌 From grid:  1.30 kWh",
+    ]
+
+
+def test_energy_report_uses_local_date_for_day_chart():
+    clock = Clock()  # 13:46 on 12 Jan UTC is 02:46 on 13 Jan in Auckland (UTC+13)
+    client = DateClient()
+    run = make_energy_report(client, FakeNotifier(), ZoneInfo("Pacific/Auckland"), clock=clock)
+    a(run())
+    assert client.dates == ["1970-01-13"]
+
+
+class DateClient(FakeClient):
+    def __init__(self):
+        super().__init__()
+        self.dates = []
+
+    async def acall(self, _method, *args):
+        self.dates.append(args[0])
+        return None
 
 
 def test_energy_report_falls_back_when_history_is_down():
     client, notifier = FakeClient(), FakeNotifier()
     client.payload = {"result": 1, "obj": {"charts": {"userLoad": [1000] * 12}}}
-    run = make_energy_report(client, notifier, history=History(BrokenBackend()))
+    run = make_energy_report(client, notifier, UTC, history=History(BrokenBackend()))
     a(run())
     assert notifier.sent == ["📊 Load energy today so far: 1.00 kWh"]
 

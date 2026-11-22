@@ -87,6 +87,17 @@ class GrowattClient:
         self.fatal_auth_callback: Optional[Callable[[str], Awaitable[None]]] = None
         self._unreachable_alerted = False
         self._fatal_alerted = False
+        # Called with None after a call Growatt answered, or the exception after
+        # a failed attempt. Must be quick and must not block.
+        self.call_listener: Optional[Callable[[Optional[Exception]], None]] = None
+
+    def _notify_listener(self, error: Optional[Exception]) -> None:
+        if self.call_listener is None:
+            return
+        try:
+            self.call_listener(error)
+        except Exception:
+            log.exception("call_listener failed")
 
     # ---------- auth ----------
 
@@ -260,9 +271,11 @@ class GrowattClient:
                 result = await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
                 self._consecutive_failures = 0
                 self._unreachable_alerted = False
+                self._notify_listener(None)
                 return result
             except GrowattAuthFatal as e:
                 log.error("Fatal auth error: %s", e)
+                self._notify_listener(e)
                 if not self._fatal_alerted and self.fatal_auth_callback is not None:
                     self._fatal_alerted = True
                     try:
@@ -274,8 +287,10 @@ class GrowattClient:
                 log.info("Growatt %s: %s", fn_name, e)
                 self._consecutive_failures = 0
                 self._unreachable_alerted = False
+                self._notify_listener(None)
                 return None
             except GrowattAuthLocked as e:
+                self._notify_listener(e)
                 log.warning(
                     "Account locked (attempt %d): %s — sleeping %.0fs",
                     attempt, e, locked_delay,
@@ -285,6 +300,7 @@ class GrowattClient:
                 continue
             except (requests.RequestException, GrowattAPIError, GrowattAuthError) as e:
                 self._consecutive_failures += 1
+                self._notify_listener(e)
                 log.error(
                     "Growatt %s failed (attempt %d, consecutive failures %d): %s",
                     fn_name, attempt, self._consecutive_failures, e,

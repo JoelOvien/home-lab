@@ -100,3 +100,50 @@ def total_load_energy_kwh(payload: dict) -> Optional[float]:
     if not watts:
         return None
     return sum(watts) / SAMPLES_PER_HOUR / 1000
+
+
+def _to_int(v: Any) -> Optional[int]:
+    f = _to_float(v)
+    return None if f is None else int(f)
+
+
+def load_percent(payload: dict) -> Optional[float]:
+    """Load as a % of the inverter's rating (Growatt spells it loadPrecent)."""
+    return _to_float(_obj(payload).get("loadPrecent"))
+
+
+def inv_status(payload: dict) -> Optional[int]:
+    return _to_int(_obj(payload).get("invStatus"))
+
+
+def status_code(payload: dict) -> Optional[int]:
+    return _to_int(_obj(payload).get("status"))
+
+
+def dtc(payload: dict) -> Optional[int]:
+    return _to_int(_obj(payload).get("dtc"))
+
+
+# SPF off-grid system status codes, from Growatt's SPF Modbus protocol. Not yet
+# checked against the dashboard, so callers always show the raw code too.
+STATUS_NAMES = {
+    0: "standby",
+    1: "no use",
+    2: "discharging",
+    3: "fault",
+    4: "flash (firmware update)",
+    5: "PV charging",
+    6: "AC charging",
+    7: "PV + AC charging",
+    8: "PV + AC charging, grid bypass",
+    9: "PV charging, grid bypass",
+    10: "AC charging, grid bypass",
+    11: "grid bypass",
+    12: "PV charging and discharging",
+}
+
+FAULT_STATUS = 3
+
+
+def status_name(code: Optional[int]) -> Optional[str]:
+    return None if code is None else STATUS_NAMES.get(code)

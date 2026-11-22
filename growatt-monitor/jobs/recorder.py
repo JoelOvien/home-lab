@@ -22,6 +22,10 @@ def make_recorder(client: GrowattClient, history: History):
             battery_v=parsers.battery_voltage(data),
             grid_v=parsers.grid_voltage(data),
             grid_present=parsers.grid_present(data),
+            load_pct=parsers.load_percent(data),
+            inv_status=parsers.inv_status(data),
+            status=parsers.status_code(data),
+            dtc=parsers.dtc(data),
         )
 
     return run

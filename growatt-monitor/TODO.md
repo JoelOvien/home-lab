@@ -5,43 +5,47 @@ they ship.
 
 ## Fixes
 
-- [ ] **Timezone.** Railway runs in UTC, so `energy_report`'s day-chart date is
+- [x] **Timezone.** Railway runs in UTC, so `energy_report`'s day-chart date is
   wrong around local midnight. Add a `TZ` setting and use it for dates and for
   showing clock times.
-- [ ] **Daily report at a fixed time** (e.g. 21:00 local) instead of every 12h
+- [x] **Daily report at a fixed time** (e.g. 21:00 local) instead of every 12h
   counted from whenever the worker started.
 
 ## New commands
 
-- [ ] `/today`: today's kWh used, on demand.
-- [ ] `/runtime`: estimated battery time left at the current load. Needs a new
+- [x] `/today`: today's kWh used, on demand.
+- [x] `/runtime`: estimated battery time left at the current load. Needs a new
   battery-capacity setting (kWh).
-- [ ] `/flow`: one-line power snapshot, e.g. "PV 1.2 kW → load 0.8 kW, battery
-  +0.4 kW charging, grid 0 W". Confirm `batPower`'s sign (charging vs
-  discharging) against the live dashboard first.
-- [ ] `/faults`: inverter mode and fault code (`invStatus`, `status`, `dtc`)
+- [x] `/flow`: one-line power snapshot, e.g. "PV 1.2 kW → load 0.8 kW, battery
+  +0.4 kW charging, grid 0 W". Battery direction shows only once
+  `BATTERY_SIGN` is set.
+- [x] Confirm `batPower`'s sign: positive while charging, so
+  `BATTERY_SIGN=charge_positive`.
+- [x] `/faults`: inverter mode and fault code (`invStatus`, `status`, `dtc`)
   in plain words.
-- [ ] `/chart`: today's load and solar curve as an image (matplotlib).
-- [ ] `/mute 2h`: pause alerts for a while.
-- [ ] `/uptime`: worker uptime, last successful Growatt call, recent errors.
+- [x] `/chart`: today's load and solar curve as an image (matplotlib).
+- [x] `/mute 2h`: pause alerts for a while.
+- [x] `/uptime`: worker uptime, last successful Growatt call, recent errors.
 
 ## Alerts
 
-- [ ] **Overload**: warn when `loadPrecent` goes above ~85%, before the
+- [x] **Overload**: warn when `loadPrecent` goes above ~85%, before the
   inverter trips.
-- [ ] **Fault code**: alert when `dtc` changes.
-- [ ] **Battery full**.
-- [ ] **Solar stopped**: no PV during daylight (dirty panels, tripped breaker).
+- [x] **Fault code**: alert when `dtc` changes, or `status` turns 3 (fault).
+- [ ] Check whether `dtc` (20006 on a healthy inverter) is a fault code or a
+  device-type code, and confirm the `status` names `/faults` shows.
+- [x] **Battery full**.
+- [x] **Solar stopped**: no PV during daylight (dirty panels, tripped breaker).
 
 ## History (D1)
 
-- [ ] `/week` and `/month` energy totals.
-- [ ] Solar vs grid split: how much of the energy used came from each.
-- [ ] Battery health trend (voltage at a given SOC over weeks).
+- [x] `/week` and `/month` energy totals.
+- [x] Solar vs grid split: how much of the energy used came from each.
+- [x] Battery health trend (voltage at a given SOC over weeks).
 
 ## Code health
 
-- [ ] Shared wrapper for the command handlers' repeated try/except and
+- [x] Shared wrapper for the command handlers' repeated try/except and
   offline handling, so each new command is a few lines.
 - [ ] Capture a real `getStorageEnergyDayChart` payload into `tests/fixtures/`
   and test `total_load_energy_kwh` against it.

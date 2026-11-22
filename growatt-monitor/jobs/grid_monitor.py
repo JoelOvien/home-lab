@@ -62,7 +62,8 @@ def make_grid_monitor(client: GrowattClient, notifier: Notifier, history=None, c
             else:
                 state["lost_at"] = clock()
             state["last_present"] = present
-            await notifier.send(fmt_grid_change(present, voltage, outage))
+            await notifier.alert("grid_up" if present else "grid_down",
+                               fmt_grid_change(present, voltage, outage))
             if history is not None:
                 await record(present)
 

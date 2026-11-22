@@ -33,7 +33,7 @@ def make_battery_monitor(client: GrowattClient, notifier: Notifier, levels: tupl
             return
         armed.difference_update(crossed)
         log.info("battery_monitor: SOC %.0f%% crossed %s", soc, crossed)
-        await notifier.send(fmt_battery_low(
+        await notifier.alert("battery_low", fmt_battery_low(
             soc,
             min(crossed),
             parsers.battery_voltage(data),

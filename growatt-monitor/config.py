@@ -1,5 +1,9 @@
 import os
+import re
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+BATTERY_SIGNS = ("charge_positive", "charge_negative")
 
 
 class ConfigError(RuntimeError):
@@ -19,10 +23,20 @@ class Config:
     cloudflare_account_id: str | None = None
     cloudflare_d1_database_id: str | None = None
     cloudflare_api_token: str | None = None
+    tz_name: str = "UTC"
+    daily_report_time: str = "21:00"
+    battery_capacity_kwh: float | None = None
+    load_alert_pct: float = 85.0
+    solar_check_hours: tuple[int, int] = (10, 15)
+    battery_sign: str | None = None
 
     @property
     def use_d1(self) -> bool:
         return self.cloudflare_api_token is not None
+
+    @property
+    def tz(self) -> ZoneInfo:
+        return ZoneInfo(self.tz_name)
 
     @staticmethod
     def from_env() -> "Config":
@@ -62,6 +76,14 @@ class Config:
             cloudflare_account_id=os.environ.get("CLOUDFLARE_ACCOUNT_ID") or None,
             cloudflare_d1_database_id=os.environ.get("CLOUDFLARE_D1_DATABASE_ID") or None,
             cloudflare_api_token=os.environ.get("CLOUDFLARE_API_TOKEN") or None,
+            tz_name=_parse_tz(os.environ.get("TZ") or "UTC"),
+            daily_report_time=_parse_hhmm(os.environ.get("DAILY_REPORT_TIME") or "21:00"),
+            battery_capacity_kwh=_parse_positive(
+                "BATTERY_CAPACITY_KWH", os.environ.get("BATTERY_CAPACITY_KWH")
+            ),
+            load_alert_pct=_parse_positive("LOAD_ALERT_PCT", os.environ.get("LOAD_ALERT_PCT") or "85"),
+            solar_check_hours=_parse_hours(os.environ.get("SOLAR_CHECK_HOURS") or "10-15"),
+            battery_sign=_parse_sign(os.environ.get("BATTERY_SIGN")),
         )
 
 
@@ -73,3 +95,45 @@ def _parse_levels(raw: str) -> tuple[int, ...]:
     if any(not 0 < lvl < 100 for lvl in levels):
         raise ConfigError("BATTERY_ALERT_LEVELS values must be between 1 and 99")
     return tuple(levels)
+
+
+def _parse_tz(raw: str) -> str:
+    try:
+        ZoneInfo(raw)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ConfigError(f"TZ must be an IANA time zone like Africa/Lagos, got {raw!r}")
+    return raw
+
+
+def _parse_hhmm(raw: str) -> str:
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", raw.strip())
+    if not m or int(m[1]) > 23 or int(m[2]) > 59:
+        raise ConfigError(f"DAILY_REPORT_TIME must be HH:MM, got {raw!r}")
+    return f"{int(m[1]):02d}:{m[2]}"
+
+
+def _parse_positive(name: str, raw: str | None) -> float | None:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ConfigError(f"{name} must be a number, got {raw!r}")
+    if value <= 0:
+        raise ConfigError(f"{name} must be above 0")
+    return value
+
+
+def _parse_hours(raw: str) -> tuple[int, int]:
+    m = re.fullmatch(r"(\d{1,2})-(\d{1,2})", raw.strip())
+    if not m or not 0 <= int(m[1]) < int(m[2]) <= 24:
+        raise ConfigError(f"SOLAR_CHECK_HOURS must look like 10-15, got {raw!r}")
+    return int(m[1]), int(m[2])
+
+
+def _parse_sign(raw: str | None) -> str | None:
+    if raw is None or not raw.strip():
+        return None
+    if raw.strip() not in BATTERY_SIGNS:
+        raise ConfigError(f"BATTERY_SIGN must be one of {', '.join(BATTERY_SIGNS)}")
+    return raw.strip()

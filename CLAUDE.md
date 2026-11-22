@@ -12,6 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `worker` process (`Procfile`). There is no HTTP server, so don't add one.
 - `growatt-widget/`: a macOS WidgetKit widget that reads the worker's D1
   history. See [macOS widget](#macos-widget) below.
+- `growatt-app/`: a Flutter phone dashboard (Android + iOS) that also reads
+  D1 only. See [Flutter app](#flutter-app) below.
 
 All commands below, up to the widget section, run from `growatt-monitor/`.
 Imports are top-level (`from growatt import parsers`), so run things from that
@@ -31,6 +33,10 @@ Required env vars (startup fails fast if any are missing, see `config.py`):
 `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `BATTERY_ALERT_LEVELS` (default `30,15`); `CLOUDFLARE_ACCOUNT_ID`,
 `CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN` (all three or none) to store
 history in D1; otherwise `HISTORY_DB_PATH` (default `data/history.db`).
+Also optional: `TZ` (IANA, default `UTC`; production uses `Africa/Lagos`),
+`DAILY_REPORT_TIME` (default `21:00`), `BATTERY_CAPACITY_KWH`,
+`LOAD_ALERT_PCT` (default 85), `SOLAR_CHECK_HOURS` (default `10-15`),
+`BATTERY_SIGN` (`charge_positive` or `charge_negative`).
 Commands only respond to `TELEGRAM_CHAT_ID` (a `filters.Chat` in `main.py`).
 
 No linter or formatter is configured.
@@ -86,6 +92,17 @@ the scheduler side by side until SIGINT/SIGTERM.
   gaps over 15 min, and falls back to the day chart below 50% coverage.
   `batPower` is stored raw because its sign convention is unverified.
 - **`bot/notifications.py`**: `Notifier.send` plus message formatters.
+  Alerts go through `Notifier.alert(kind, text)`, which always writes an
+  `events` row and skips Telegram while muted (`muted_until_ts`).
+- **D1 contract shared with the widget and app**: `snapshots` (plus
+  `load_pct`, `inv_status`, `status`, `dtc`, added by `ALTER TABLE` in the
+  lazy schema step), `outages`, `worker_state` (key/value: `started_ts`,
+  `last_ok_ts`, `last_error`, `last_error_ts`, `muted_until_ts`,
+  `battery_capacity_kwh`, `tz`, `battery_sign`) and `events` (`kind` in
+  `EVENT_KINDS`). Renaming any of these breaks the app.
+- **`jobs/status_alerts.py`**: overload, fault (`dtc` change or `status` 3),
+  battery full and solar stopped, all from one status poll. `energy_report`
+  runs daily at `DAILY_REPORT_TIME` via `Scheduler.register_daily`.
 
 ## Growatt API notes
 
@@ -129,3 +146,24 @@ xcodebuild -project GrowattWidget.xcodeproj -scheme GrowattWidget -configuration
 
 `xcodebuild` fails inside the Claude Code sandbox because it can't write its
 build files, so it has to run outside it. There are no tests.
+
+## Flutter app
+
+`growatt-app/` is a Riverpod + GoRouter Flutter app with four tabs (Now,
+Charts, Activity, System). It reads D1 with SELECTs only, through
+`lib/core/inverter/inverter_repository.dart`, and must never call Growatt.
+It tolerates the old schema: "no such table/column" errors become empty results.
+
+- Credentials: `--dart-define-from-file=secrets.json` (`accountId`,
+  `databaseId`, `apiToken`, a D1 Read token). `secrets.json` is gitignored.
+  `--dart-define=FAKE_DATA=true` (or `old_schema`) runs on generated data.
+- The root `.gitignore` ignores `lib/`, so `growatt-app/.gitignore` re-includes it.
+- Flutter writes to its SDK cache, so `flutter` commands fail inside the
+  Claude Code sandbox.
+
+```bash
+cd growatt-app
+flutter analyze && flutter test
+flutter run --dart-define-from-file=secrets.json
+flutter build apk --release --dart-define-from-file=secrets.json
+```

@@ -40,3 +40,13 @@ def test_load_energy_integrates_5_minute_watts():
 def test_load_energy_none_when_no_samples():
     payload = {"result": 1, "obj": {"charts": {"userLoad": [None] * 288}}}
     assert parsers.total_load_energy_kwh(payload) is None
+
+
+def test_mode_fields_from_real_payload():
+    assert parsers.load_percent(STATUS) == 14.8
+    assert parsers.inv_status(STATUS) == -10
+    assert parsers.status_code(STATUS) == 8
+    assert parsers.dtc(STATUS) == 20006
+    empty = {"result": 1, "obj": {}}
+    assert [parsers.load_percent(empty), parsers.inv_status(empty),
+            parsers.status_code(empty), parsers.dtc(empty)] == [None] * 4

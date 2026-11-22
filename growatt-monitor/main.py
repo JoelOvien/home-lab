@@ -20,7 +20,9 @@ from jobs.grid_monitor import make_grid_monitor
 from jobs.energy_report import make_energy_report
 from jobs.battery_monitor import make_battery_monitor
 from jobs.recorder import make_recorder
+from jobs.status_alerts import make_status_alerts
 from history import History, LocalBackend, D1Backend
+from health import WorkerHealth
 
 
 def setup_logging() -> None:
@@ -35,6 +37,25 @@ def setup_logging() -> None:
 
 
 log = logging.getLogger("growatt-monitor")
+
+
+async def write_startup_state(history: History, cfg: Config, started_ts: float) -> None:
+    """Publish settings the app needs. Unset ones are deleted, so a value
+    removed from Railway doesn't linger as if it were still configured."""
+    values = {
+        "started_ts": int(started_ts),
+        "tz": cfg.tz_name,
+        "battery_capacity_kwh": cfg.battery_capacity_kwh,
+        "battery_sign": cfg.battery_sign,
+    }
+    try:
+        for key, value in values.items():
+            if value is None:
+                await history.delete_state(key)
+            else:
+                await history.set_state(key, value)
+    except Exception:
+        log.exception("Could not write worker state to history")
 
 
 async def amain() -> None:
@@ -66,6 +87,10 @@ async def amain() -> None:
     history = History(backend)
     bot_commands.bind_history(history)
 
+    health = WorkerHealth(history)
+    client.call_listener = health.on_call
+    await write_startup_state(history, cfg, health.started_ts)
+
     # ---- Telegram application ----
     application = (
         ApplicationBuilder()
@@ -79,10 +104,15 @@ async def amain() -> None:
         application.add_handler(CommandHandler(cmd.name, cmd.handler, filters=owner_only))
     application.add_handler(MessageHandler(filters.COMMAND & owner_only, bot_commands.cmd_unknown))
 
-    notifier = Notifier(application.bot, cfg.telegram_chat_id)
+    notifier = Notifier(application.bot, cfg.telegram_chat_id, history)
+    bot_commands.bind(
+        notifier=notifier,
+        health=health,
+        settings=bot_commands.Settings(cfg.tz, cfg.battery_capacity_kwh, cfg.battery_sign),
+    )
 
     async def unreachable_alert() -> None:
-        await notifier.send("⚠️ Cannot reach Growatt API. Will keep retrying.")
+        await notifier.alert("unreachable", "⚠️ Cannot reach Growatt API. Will keep retrying.")
     client.unreachable_callback = unreachable_alert
 
     async def fatal_auth_alert(msg: str) -> None:
@@ -105,15 +135,22 @@ async def amain() -> None:
         fn=make_battery_monitor(client, notifier, cfg.battery_alert_levels),
     )
     scheduler.register(
+        "status_alerts",
+        interval_seconds=300,
+        fn=make_status_alerts(
+            client, notifier, cfg.load_alert_pct, cfg.solar_check_hours, cfg.tz
+        ),
+    )
+    scheduler.register(
         "recorder",
         interval_seconds=300,
         fn=make_recorder(client, history),
     )
-    scheduler.register(
+    scheduler.register_daily(
         "energy_report",
-        interval_seconds=12 * 3600,
-        fn=make_energy_report(client, notifier, hours=12, history=history),
-        run_immediately=False,
+        cfg.daily_report_time,
+        cfg.tz,
+        make_energy_report(client, notifier, cfg.tz, history=history),
     )
 
     # ---- Lifecycle ----

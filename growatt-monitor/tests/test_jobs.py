@@ -22,8 +22,13 @@ class FakeClient:
 class FakeNotifier:
     def __init__(self):
         self.sent = []
+        self.kinds = []
 
     async def send(self, text):
+        self.sent.append(text)
+
+    async def alert(self, kind, text):
+        self.kinds.append(kind)
         self.sent.append(text)
 
 
@@ -55,6 +60,7 @@ def test_battery_alerts_once_per_level():
     step(28)
     assert len(notifier.sent) == 1
     assert "below 30%" in notifier.sent[0]
+    assert notifier.kinds == ["battery_low"]
     step(14)
     assert len(notifier.sent) == 2
     assert "below 15%" in notifier.sent[1]
@@ -101,6 +107,7 @@ def test_grid_restore_reports_outage_duration():
 
     assert notifier.sent[0].startswith("⚠️ Grid LOST")
     assert "RESTORED after 2h 14m" in notifier.sent[1]
+    assert notifier.kinds == ["grid_down", "grid_up"]
 
 
 def test_grid_restore_without_seen_loss_has_no_duration():
