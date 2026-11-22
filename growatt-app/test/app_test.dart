@@ -90,7 +90,7 @@ void main() {
     expect(find.textContaining('BATTERY_CAPACITY_KWH'), findsOneWidget);
   });
 
-  testWidgets('Now tab shows Growatt energy counters', (tester) async {
+  testWidgets('Energy tab shows Growatt energy counters', (tester) async {
     tester.view.physicalSize = const Size(1200, 5000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -98,14 +98,21 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source()),
     ]);
-    expect(find.text('ENERGY'), findsOneWidget);
+    expect(find.text('Photovoltaic output'), findsNothing);
+    expect(find.text('ENERGY TODAY'), findsOneWidget);
+    expect(find.text('6.10 kWh'), findsOneWidget);
+    expect(find.text('3.60 kWh'), findsOneWidget);
+    expect(find.text('4.70 kWh'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.energy_savings_leaf_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('TODAY AND TOTAL'), findsOneWidget);
     expect(find.text('Photovoltaic output'), findsOneWidget);
     expect(find.text('6.1 kWh'), findsOneWidget);
     expect(find.text('Total 131.2 kWh'), findsOneWidget);
     expect(find.text('Total 7.0 kWh'), findsOneWidget);
   });
 
-  testWidgets('Energy section is hidden when every counter is null', (tester) async {
+  testWidgets('Energy tab says so when every counter is null', (tester) async {
     tester.view.physicalSize = const Size(1200, 5000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -113,8 +120,10 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source(oldSchema: true)),
     ]);
-    expect(find.text('BATTERY'), findsWidgets);
-    expect(find.text('ENERGY'), findsNothing);
+    expect(find.text('ENERGY TODAY'), findsNothing);
+    await tester.tap(find.byIcon(Icons.energy_savings_leaf_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Not recorded yet'), findsOneWidget);
     expect(find.text('Photovoltaic output'), findsNothing);
   });
 
@@ -139,7 +148,7 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source()),
     ]);
-    for (final icon in [Icons.show_chart, Icons.history, Icons.dns_outlined]) {
+    for (final icon in [Icons.energy_savings_leaf_outlined, Icons.show_chart, Icons.history, Icons.dns_outlined]) {
       await tester.tap(find.byIcon(icon));
       await tester.pumpAndSettle();
     }

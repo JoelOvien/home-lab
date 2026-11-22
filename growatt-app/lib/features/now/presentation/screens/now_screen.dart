@@ -5,7 +5,6 @@ import 'package:growatt_app/core/inverter/inverter_repository.dart';
 import 'package:growatt_app/core/inverter/models.dart';
 import 'package:growatt_app/core/providers.dart';
 import 'package:growatt_app/features/now/presentation/providers/now_notifier.dart';
-import 'package:growatt_app/features/now/presentation/widgets/energy_section.dart';
 import 'package:growatt_app/shared/functions/formatters.dart';
 import 'package:growatt_app/shared/theme/extensions/theme_extensions.dart';
 import 'package:growatt_app/shared/widgets/cards/section_card.dart';
@@ -53,6 +52,8 @@ class NowScreen extends ConsumerWidget {
         ),
       _GridCard(snapshot: s, outage: openOutage, now: now),
       _MetricGrid(snapshot: s, flow: flow),
+      if (s != null && (s.energy.load.today ?? s.energy.pv.today ?? s.energy.import.today) != null)
+        _energyToday(context, s.energy),
       SectionCard(title: 'Flow', child: Text(_flowLine(s, flow), style: context.typography.bodyMd)),
       SectionCard(
         title: 'Battery',
@@ -73,7 +74,6 @@ class NowScreen extends ConsumerWidget {
           ),
         ]),
       ),
-      if (s != null && !s.energy.isEmpty) EnergySection(counters: s.energy),
       if (s != null && (s.invStatus != null || s.status != null || s.dtc != null))
         SectionCard(
           title: 'Inverter',
@@ -200,4 +200,19 @@ class _MetricGrid extends StatelessWidget {
       Row(children: [Expanded(child: tiles[2]), const SizedBox(width: 12), Expanded(child: tiles[3])]),
     ]);
   }
+}
+
+
+/// Same figures as the bot's daily report, from Growatt's own counters.
+Widget _energyToday(BuildContext context, EnergyCounters e) {
+  return SectionCard(
+    title: 'Energy today',
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      InfoRow(label: 'Used', value: formatKwh(e.load.today)),
+      InfoRow(label: 'Solar made', value: formatKwh(e.pv.today)),
+      InfoRow(label: 'From grid', value: formatKwh(e.import.today)),
+      const SizedBox(height: 6),
+      Text('Grid draw includes any battery charging from the grid.', style: context.typography.caption),
+    ]),
+  );
 }

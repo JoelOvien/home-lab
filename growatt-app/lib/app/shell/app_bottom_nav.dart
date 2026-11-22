@@ -49,11 +49,13 @@ class AppBottomNav extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               for (var i = 0; i < tabs.length; i++)
-                _NavItem(
-                  icon: tabs[i].icon,
-                  label: tabs[i].label,
-                  selected: currentIndex == i,
-                  onTap: () => onTap(i),
+                Expanded(
+                  child: _NavItem(
+                    icon: tabs[i].icon,
+                    label: tabs[i].label,
+                    selected: currentIndex == i,
+                    onTap: () => onTap(i),
+                  ),
                 ),
             ],
           ),
@@ -86,7 +88,6 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 72,
         height: 64,
         child: Stack(
           alignment: Alignment.center,
@@ -95,13 +96,14 @@ class _NavItem extends StatelessWidget {
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
               top: selected ? 0 : -4,
-              left: 26,
-              right: 26,
+              left: 0,
+              right: 0,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 200),
                 opacity: selected ? 1.0 : 0.0,
                 child: Container(
                   height: 2.5,
+                  margin: const EdgeInsets.symmetric(horizontal: 22),
                   decoration: BoxDecoration(
                     color: primary,
                     borderRadius: const BorderRadius.vertical(

@@ -31,7 +31,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.dispose();
   }
 
-  // The Now tab refreshes itself; the others fetch once, so refresh them
+  // Now and Energy refresh themselves; the others fetch once, so refresh them
   // whenever they're shown again.
   void _refreshTabs() {
     ref.invalidate(chartsProvider);
@@ -43,11 +43,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     final shell = widget.navigationShell;
     if (index != shell.currentIndex) {
       switch (index) {
-        case 1:
-          ref.invalidate(chartsProvider);
         case 2:
-          ref.invalidate(activityProvider);
+          ref.invalidate(chartsProvider);
         case 3:
+          ref.invalidate(activityProvider);
+        case 4:
           ref.invalidate(systemProvider);
       }
     }
@@ -65,6 +65,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         onTap: _onTap,
         tabs: const [
           (icon: Icons.bolt, label: 'Now'),
+          (icon: Icons.energy_savings_leaf_outlined, label: 'Energy'),
           (icon: Icons.show_chart, label: 'Charts'),
           (icon: Icons.history, label: 'Activity'),
           (icon: Icons.dns_outlined, label: 'System'),

@@ -22,7 +22,7 @@ class EnergySection extends StatelessWidget {
       _EnergyTile(icon: Icons.home_outlined, color: AppColors.energyLoad, label: 'Load consumption', value: c.load),
     ];
     return SectionCard(
-      title: 'Energy',
+      title: 'Today and total',
       child: Column(children: [
         for (var i = 0; i < tiles.length; i += 2) ...[
           if (i > 0) const SizedBox(height: 10),
