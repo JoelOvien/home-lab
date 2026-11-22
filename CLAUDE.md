@@ -172,7 +172,11 @@ It tolerates the old schema: "no such table/column" errors become empty results.
   `res/layout/status_widget.xml`) shows strings that
   `lib/core/widget/home_widget_sync.dart` saves with `home_widget`. They are
   pushed after each successful Now refresh and by a 15-minute `workmanager`
-  task that reads D1 headlessly. There is no iOS widget yet.
+  task that reads D1 headlessly. There is no iOS widget yet. Update the app
+  in place (`adb install -r`). After an uninstall and reinstall, Samsung's
+  One UI Home can keep the old APK's resources and show "Couldn't add
+  widget" (`NotFoundException` for the layout). Restart the launcher with
+  `adb shell am force-stop com.sec.android.app.launcher` to fix it.
 - Theme is Material 3 and matches the home screen widget: Material You
   dynamic colour via `dynamic_color` (pinned to 1.x, since 2.x needs the
   separate `material_ui` package), falling back to the baseline purple seed
