@@ -13,7 +13,9 @@ def make_recorder(client: GrowattClient, history: History):
         if data is None:
             log.info("recorder: device offline, skipping")
             return
+        totals = await client.acall("get_device_totals")
         await history.add_snapshot(
+            **(parsers.energy_totals(totals) if totals else {}),
             pv_w=parsers.pv_watts(data),
             load_w=parsers.load_watts(data),
             grid_w=parsers.grid_watts(data),

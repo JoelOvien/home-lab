@@ -16,6 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from bot import commands  # noqa: E402
 from bot.notifications import Notifier  # noqa: E402
 from config import Config, ConfigError  # noqa: E402
+from growatt import parsers  # noqa: E402
 from growatt.client import GrowattAPIError, GrowattClient  # noqa: E402
 from health import OK_WRITE_INTERVAL, WorkerHealth  # noqa: E402
 from history import History, LocalBackend  # noqa: E402
@@ -143,6 +144,38 @@ def test_recorder_writes_mode_columns(make_store):
     a(make_recorder(client, h)())
     rows = h.backend.execute("SELECT load_pct, inv_status, status, dtc FROM snapshots")
     assert rows == [{"load_pct": 14.8, "inv_status": -10, "status": 8, "dtc": 20006}]
+
+
+TOTALS = json.loads((pathlib.Path(__file__).parent / "fixtures/storage_totals.json").read_text())
+
+
+def test_energy_totals_match_dashboard_fixture():
+    t = parsers.energy_totals(TOTALS)
+    assert (t["pv_today_kwh"], t["pv_total_kwh"]) == (3.6, 3.7)
+    assert (t["charge_today_kwh"], t["charge_total_kwh"]) == (3.7, 65.5)
+    assert (t["discharge_today_kwh"], t["discharge_total_kwh"]) == (1.4, 7.0)
+    assert (t["import_today_kwh"], t["import_total_kwh"]) == (4.7, 131.2)
+    assert (t["load_today_kwh"], t["load_total_kwh"]) == (6.1, 73.8)
+    assert set(parsers.energy_totals({"result": 1, "obj": {}}).values()) == {None}
+
+
+class TotalsClient:
+    def __init__(self, totals):
+        self.totals = totals
+
+    async def acall(self, method, *args):
+        return {"get_device_status": FIXTURE, "get_device_totals": self.totals}[method]
+
+
+def test_recorder_writes_energy_totals(make_store):
+    h = make_store(Clock())
+    a(make_recorder(TotalsClient(TOTALS), h)())
+    a(make_recorder(TotalsClient(None), h)())
+    rows = h.backend.execute("SELECT charge_total_kwh, load_today_kwh, soc FROM snapshots")
+    assert rows == [
+        {"charge_total_kwh": 65.5, "load_today_kwh": 6.1, "soc": 75.0},
+        {"charge_total_kwh": None, "load_today_kwh": None, "soc": 75.0},
+    ]
 
 
 # ---------- daily scheduler ----------
@@ -326,27 +359,26 @@ def test_new_config_defaults(monkeypatch):
     base_env(monkeypatch)
     cfg = Config.from_env()
     assert (cfg.tz_name, cfg.daily_report_time, cfg.battery_capacity_kwh,
-            cfg.load_alert_pct, cfg.solar_check_hours, cfg.battery_sign) == (
-        "UTC", "21:00", None, 85.0, (10, 15), None)
+            cfg.load_alert_pct, cfg.solar_check_hours) == (
+        "UTC", "21:00", None, 85.0, (10, 15))
 
 
 def test_new_config_values(monkeypatch):
     base_env(monkeypatch)
     for k, v in {"TZ": "Africa/Lagos", "DAILY_REPORT_TIME": "7:30",
                  "BATTERY_CAPACITY_KWH": "10.24", "LOAD_ALERT_PCT": "90",
-                 "SOLAR_CHECK_HOURS": "9-16", "BATTERY_SIGN": "charge_negative"}.items():
+                 "SOLAR_CHECK_HOURS": "9-16"}.items():
         monkeypatch.setenv(k, v)
     cfg = Config.from_env()
     assert cfg.tz.key == "Africa/Lagos"
     assert cfg.daily_report_time == "07:30"
     assert cfg.battery_capacity_kwh == 10.24
     assert cfg.solar_check_hours == (9, 16)
-    assert cfg.battery_sign == "charge_negative"
 
 
 @pytest.mark.parametrize("key,value", [
     ("TZ", "Mars/Olympus"), ("DAILY_REPORT_TIME", "25:00"), ("BATTERY_CAPACITY_KWH", "-1"),
-    ("SOLAR_CHECK_HOURS", "15-10"), ("BATTERY_SIGN", "positive"), ("LOAD_ALERT_PCT", "abc"),
+    ("SOLAR_CHECK_HOURS", "15-10"), ("LOAD_ALERT_PCT", "abc"),
 ])
 def test_bad_config_rejected(monkeypatch, key, value):
     base_env(monkeypatch)
@@ -423,12 +455,13 @@ def test_history_command_error(bound):
     assert run_cmd(commands.cmd_month).replies == [commands.HISTORY_ERROR_MSG]
 
 
-def test_flow_direction_needs_sign():
-    data = payload(batPower=-400)
-    assert "battery 400 W (direction unknown)" in commands.render_flow(data, None)
-    assert "battery 400 W discharging" in commands.render_flow(data, "charge_positive")
-    assert "battery 400 W charging" in commands.render_flow(data, "charge_negative")
-    assert commands.render_flow(FIXTURE, None) == (
+def test_flow_direction_comes_from_status():
+    # Live readings: batPower is unsigned, status gives the direction.
+    assert "battery 318 W discharging" in commands.render_flow(payload(batPower=318, status=2))
+    assert "battery 10 W charging" in commands.render_flow(payload(batPower=10, status=10))
+    assert "battery 400 W (direction unknown)" in commands.render_flow(payload(batPower=400, status=11))
+    assert "battery 400 W (direction unknown)" in commands.render_flow(payload(batPower=400, status=""))
+    assert commands.render_flow(FIXTURE) == (
         "☀️ PV 21 W → ⚡ load 824 W | 🔋 battery idle | 🔌 grid 933 W")
 
 
@@ -546,7 +579,7 @@ def test_every_command_runs_without_error(bound, make_store):
     bound.monkeypatch.setattr(commands, "_history", h)
     bound.monkeypatch.setattr(commands, "_notifier", Notifier(FakeBot(), "1", h, clock=clock))
     bound.monkeypatch.setattr(commands, "_health", WorkerHealth(h, clock=clock))
-    bound.monkeypatch.setattr(commands, "_settings", commands.Settings(UTC, 10.0, "charge_positive"))
+    bound.monkeypatch.setattr(commands, "_settings", commands.Settings(UTC, 10.0))
     for c in commands.COMMANDS:
         args = ["1h"] if c.name == "mute" else []
         msg = run_cmd(c.handler, *args)

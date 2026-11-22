@@ -1,10 +1,8 @@
+import json
 import os
 import re
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-BATTERY_SIGNS = ("charge_positive", "charge_negative")
-
 
 class ConfigError(RuntimeError):
     pass
@@ -28,7 +26,7 @@ class Config:
     battery_capacity_kwh: float | None = None
     load_alert_pct: float = 85.0
     solar_check_hours: tuple[int, int] = (10, 15)
-    battery_sign: str | None = None
+    fcm_service_account_json: str | None = None
 
     @property
     def use_d1(self) -> bool:
@@ -83,7 +81,9 @@ class Config:
             ),
             load_alert_pct=_parse_positive("LOAD_ALERT_PCT", os.environ.get("LOAD_ALERT_PCT") or "85"),
             solar_check_hours=_parse_hours(os.environ.get("SOLAR_CHECK_HOURS") or "10-15"),
-            battery_sign=_parse_sign(os.environ.get("BATTERY_SIGN")),
+            fcm_service_account_json=_parse_service_account(
+                os.environ.get("FCM_SERVICE_ACCOUNT_JSON")
+            ),
         )
 
 
@@ -131,9 +131,14 @@ def _parse_hours(raw: str) -> tuple[int, int]:
     return int(m[1]), int(m[2])
 
 
-def _parse_sign(raw: str | None) -> str | None:
+
+def _parse_service_account(raw: str | None) -> str | None:
     if raw is None or not raw.strip():
         return None
-    if raw.strip() not in BATTERY_SIGNS:
-        raise ConfigError(f"BATTERY_SIGN must be one of {', '.join(BATTERY_SIGNS)}")
-    return raw.strip()
+    try:
+        info = json.loads(raw)
+    except ValueError:
+        raise ConfigError("FCM_SERVICE_ACCOUNT_JSON must be the service account key JSON")
+    if not isinstance(info, dict) or not {"project_id", "client_email", "private_key"} <= info.keys():
+        raise ConfigError("FCM_SERVICE_ACCOUNT_JSON is missing project_id, client_email or private_key")
+    return raw

@@ -14,8 +14,9 @@ MUTE_KEY = "muted_until_ts"
 
 
 class Notifier:
-    def __init__(self, bot: Bot, chat_id: str, history=None, clock=time.time):
+    def __init__(self, bot: Bot, chat_id: str, history=None, clock=time.time, pusher=None):
         self.bot = bot
+        self.pusher = pusher
         self.chat_id = chat_id
         self.history = history
         self.clock = clock
@@ -57,8 +58,8 @@ class Notifier:
             await self.history.set_state(MUTE_KEY, int(until_ts))
 
     async def alert(self, kind: str, text: str) -> None:
-        """Record an event and send it, unless alerts are muted. The event is
-        written even while muted; mute only silences Telegram."""
+        """Record an event, then send it to Telegram and as a push unless
+        alerts are muted. The event is written even while muted."""
         if self.history is not None:
             try:
                 await self.history.add_event(kind, text)
@@ -68,6 +69,8 @@ class Notifier:
             log.info("Muted, not sending %s alert: %s", kind, text)
             return
         await self.send(text)
+        if self.pusher is not None:
+            await self.pusher.push(kind, text)
 
 
 def fmt_clock(ts: float, tz: ZoneInfo, now: float | None = None) -> str:

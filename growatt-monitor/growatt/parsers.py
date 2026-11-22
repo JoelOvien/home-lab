@@ -59,7 +59,7 @@ def grid_watts(payload: dict) -> Optional[float]:
 
 
 def battery_watts(payload: dict) -> Optional[float]:
-    """Raw batPower. The sign convention (charge vs discharge) is unverified."""
+    """Raw batPower, a magnitude; see battery_direction for which way."""
     return _to_float(_obj(payload).get("batPower"))
 
 
@@ -147,3 +147,37 @@ FAULT_STATUS = 3
 
 def status_name(code: Optional[int]) -> Optional[str]:
     return None if code is None else STATUS_NAMES.get(code)
+
+
+CHARGING_STATUSES = {5, 6, 7, 8, 9, 10}
+DISCHARGING_STATUSES = {2}
+
+
+def battery_direction(code: Optional[int]) -> Optional[str]:
+    """batPower is unsigned (318 while discharging, 10 while AC charging), so
+    direction comes from the work-mode status. None when it doesn't say."""
+    if code in CHARGING_STATUSES:
+        return "charging"
+    if code in DISCHARGING_STATUSES:
+        return "discharging"
+    return None
+
+
+# Snapshot column -> getStorageTotalData field, all kWh.
+ENERGY_TOTAL_FIELDS = {
+    "pv_today_kwh": "epvToday",
+    "pv_total_kwh": "epvTotal",
+    "charge_today_kwh": "chargeToday",
+    "charge_total_kwh": "chargeTotal",
+    "discharge_today_kwh": "eDischargeToday",
+    "discharge_total_kwh": "eDischargeTotal",
+    "import_today_kwh": "eToUserToday",
+    "import_total_kwh": "eToUserTotal",
+    "load_today_kwh": "useEnergyToday",
+    "load_total_kwh": "useEnergyTotal",
+}
+
+
+def energy_totals(payload: dict) -> dict[str, Optional[float]]:
+    obj = _obj(payload)
+    return {col: _to_float(obj.get(field)) for col, field in ENERGY_TOTAL_FIELDS.items()}

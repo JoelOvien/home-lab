@@ -38,12 +38,15 @@ any are missing.
 | `BATTERY_CAPACITY_KWH` | Optional. Usable battery size in kWh, needed by `/runtime`. |
 | `LOAD_ALERT_PCT` | Optional. Overload alert threshold as % of inverter rating (`loadPrecent`), default `85`. Re-arms 10 points below. |
 | `SOLAR_CHECK_HOURS` | Optional. Local hour range for the solar-stopped alert, default `10-15` (10:00 to 14:59). |
-| `BATTERY_SIGN` | Optional. `charge_positive` or `charge_negative`: whether `batPower` is positive while charging. While unset, battery direction isn't shown. |
+| `FCM_SERVICE_ACCOUNT_JSON` | Optional. The full JSON of a Firebase service account key. When set, every alert is also sent as a push to the FCM `alerts` topic, which the Android app subscribes to. Mute silences pushes too. |
 
 For this installation (SPF 6000 ES PLUS, confirmed against the Growatt
-dashboard) set `TZ=Africa/Lagos`, `BATTERY_CAPACITY_KWH=5` and
-`BATTERY_SIGN=charge_positive` in Railway. The code defaults stay `UTC`,
-unset and unset.
+dashboard) set `TZ=Africa/Lagos` and `BATTERY_CAPACITY_KWH=5` in Railway. The code
+defaults stay `UTC` and unset.
+
+`batPower` is unsigned: it read 318 W while the dashboard showed 318 W
+discharging, and 10 W while AC charging. Battery direction comes from the
+`status` work mode instead (2 is discharging, 5 to 10 are charging).
 
 ## Commands
 
@@ -127,14 +130,16 @@ Besides `snapshots` and `outages`, the worker keeps two tables for the mobile
 app (`growatt-app/`) to read:
 
 - `worker_state(key, value, updated_ts)`: `started_ts`, `tz`,
-  `battery_capacity_kwh`, `battery_sign` (written at startup; the last two are
-  deleted when unset), `last_ok_ts` (at most every 5 min), `last_error`,
+  `battery_capacity_kwh` (written at startup; deleted when unset; a leftover
+  `battery_sign` is deleted too), `last_ok_ts` (at most every 5 min), `last_error`,
   `last_error_ts`, `muted_until_ts`.
 - `events(id, ts, kind, detail)`: one row per alert, with `kind` one of
   `grid_down`, `grid_up`, `battery_low`, `battery_full`, `overload`, `fault`,
   `solar_stopped`, `unreachable`, and `detail` the alert text.
 
-New `snapshots` columns (`load_pct`, `inv_status`, `status`, `dtc`) are added
+New `snapshots` columns (`load_pct`, `inv_status`, `status`, `dtc`, and the
+dashboard's kWh counters such as `charge_today_kwh` and `charge_total_kwh`,
+see `parsers.ENERGY_TOTAL_FIELDS`) are added
 to an existing database automatically; older rows have NULL there.
 
 If the bot crashes, Railway will restart the worker; on shutdown it sends
@@ -149,6 +154,7 @@ served by the **storage** panel endpoints, which need `plantId`:
 | Purpose | Endpoint | Params |
 |---|---|---|
 | Live status | `POST /panel/storage/getStorageStatusData?plantId=…` | form: `storageSn` |
+| Today/total kWh counters | `POST /panel/storage/getStorageTotalData?plantId=…` | form: `storageSn` |
 | Day chart (5-min samples) | `POST /panel/storage/getStorageEnergyDayChart` | form: `plantId`, `storageSn`, `date` |
 
 `/panel/spf/*` returns 404. Real payloads live in `tests/fixtures/`; run

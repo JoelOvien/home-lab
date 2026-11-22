@@ -9,6 +9,8 @@ from typing import Any, Callable, Optional
 
 import requests
 
+from growatt.parsers import ENERGY_TOTAL_FIELDS
+
 log = logging.getLogger(__name__)
 
 DEFAULT_PATH = "data/history.db"
@@ -60,11 +62,13 @@ SNAPSHOT_MIGRATIONS = [
     ("inv_status", "INTEGER"),
     ("status", "INTEGER"),
     ("dtc", "INTEGER"),
+    *((col, "REAL") for col in ENERGY_TOTAL_FIELDS),
 ]
 
 SNAPSHOT_COLUMNS = (
     "pv_w", "load_w", "grid_w", "battery_w", "soc", "battery_v", "grid_v",
     "grid_present", "load_pct", "inv_status", "status", "dtc",
+    *ENERGY_TOTAL_FIELDS,
 )
 
 EVENT_KINDS = {

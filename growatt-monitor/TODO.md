@@ -17,10 +17,9 @@ they ship.
 - [x] `/runtime`: estimated battery time left at the current load. Needs a new
   battery-capacity setting (kWh).
 - [x] `/flow`: one-line power snapshot, e.g. "PV 1.2 kW → load 0.8 kW, battery
-  +0.4 kW charging, grid 0 W". Battery direction shows only once
-  `BATTERY_SIGN` is set.
-- [x] Confirm `batPower`'s sign: positive while charging, so
-  `BATTERY_SIGN=charge_positive`.
+  +0.4 kW charging, grid 0 W". Battery direction comes from `status`.
+- [x] Confirm `batPower`'s sign: it has none (318 W while discharging, 10 W
+  while AC charging), so direction comes from the `status` work mode.
 - [x] `/faults`: inverter mode and fault code (`invStatus`, `status`, `dtc`)
   in plain words.
 - [x] `/chart`: today's load and solar curve as an image (matplotlib).

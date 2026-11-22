@@ -18,6 +18,7 @@ LOGIN_PATH = "/login"
 # require plantId as a query param. The /panel/spf/* paths return 404.
 DEVICE_DATA_PATH = "/panel/storage/getStorageStatusData"
 DEVICE_ENERGY_PATH = "/panel/storage/getStorageEnergyDayChart"
+DEVICE_TOTALS_PATH = "/panel/storage/getStorageTotalData"
 
 LOGIN_PAGE_MARKERS = ("<title>Login", 'name="account"', "loginAction")
 
@@ -239,6 +240,15 @@ class GrowattClient:
         if not payload.get("obj"):
             raise GrowattDeviceOffline(f"{DEVICE_DATA_PATH} returned no live data")
         return payload
+
+    def get_device_totals(self) -> dict:
+        """Today and lifetime kWh counters, as on the web dashboard."""
+        return self._check_result(DEVICE_TOTALS_PATH, self._request(
+            "POST",
+            DEVICE_TOTALS_PATH,
+            params={"plantId": self.plant_id},
+            data={"storageSn": self.device_sn},
+        ))
 
     def get_energy_day_chart(self, date: str) -> dict:
         # date format: "YYYY-MM-DD"

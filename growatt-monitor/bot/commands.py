@@ -42,7 +42,6 @@ class Command:
 class Settings:
     tz: ZoneInfo = ZoneInfo("UTC")
     battery_capacity_kwh: Optional[float] = None
-    battery_sign: Optional[str] = None
 
 
 # Injected by main.py at startup.
@@ -169,22 +168,20 @@ def _grid_state(present: bool | None) -> str:
 
 # ---------- pure renderers (tested directly) ----------
 
-def battery_direction(bat_w: float | None, sign: str | None) -> str:
+def battery_direction(bat_w: float | None, status: int | None) -> str:
     if bat_w is None:
         return "n/a"
     if bat_w == 0:
         return "idle"
-    if sign is None:
-        return f"{_fmt_power(abs(bat_w))} (direction unknown)"
-    charging = (bat_w > 0) == (sign == "charge_positive")
-    return f"{_fmt_power(abs(bat_w))} {'charging' if charging else 'discharging'}"
+    direction = parsers.battery_direction(status) or "(direction unknown)"
+    return f"{_fmt_power(abs(bat_w))} {direction}"
 
 
-def render_flow(data: dict, sign: str | None) -> str:
+def render_flow(data: dict) -> str:
     return (
         f"☀️ PV {_fmt_power(parsers.pv_watts(data))} → "
         f"⚡ load {_fmt_power(parsers.load_watts(data))} | "
-        f"🔋 battery {battery_direction(parsers.battery_watts(data), sign)} | "
+        f"🔋 battery {battery_direction(parsers.battery_watts(data), parsers.status_code(data))} | "
         f"🔌 grid {_fmt_power(parsers.grid_watts(data))}"
     )
 
@@ -334,7 +331,7 @@ def cmd_status(data: dict) -> str:
 
 @status_command
 def cmd_flow(data: dict) -> str:
-    return render_flow(data, _settings.battery_sign)
+    return render_flow(data)
 
 
 @status_command

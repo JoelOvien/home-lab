@@ -36,7 +36,7 @@ history in D1; otherwise `HISTORY_DB_PATH` (default `data/history.db`).
 Also optional: `TZ` (IANA, default `UTC`; production uses `Africa/Lagos`),
 `DAILY_REPORT_TIME` (default `21:00`), `BATTERY_CAPACITY_KWH`,
 `LOAD_ALERT_PCT` (default 85), `SOLAR_CHECK_HOURS` (default `10-15`),
-`BATTERY_SIGN` (`charge_positive` or `charge_negative`).
+`FCM_SERVICE_ACCOUNT_JSON` (enables push alerts, see `bot/push.py`).
 Commands only respond to `TELEGRAM_CHAT_ID` (a `filters.Chat` in `main.py`).
 
 No linter or formatter is configured.
@@ -90,15 +90,19 @@ the scheduler side by side until SIGINT/SIGTERM.
   `grid_monitor` opens and closes outage rows and resumes an open one after a
   restart. `energy_report` integrates snapshots for a rolling 12h, skipping
   gaps over 15 min, and falls back to the day chart below 50% coverage.
-  `batPower` is stored raw because its sign convention is unverified.
+  `batPower` is unsigned, so battery direction comes from `status`
+  (`parsers.battery_direction`: 2 discharging, 5 to 10 charging).
 - **`bot/notifications.py`**: `Notifier.send` plus message formatters.
   Alerts go through `Notifier.alert(kind, text)`, which always writes an
-  `events` row and skips Telegram while muted (`muted_until_ts`).
+  `events` row and skips Telegram and push while muted (`muted_until_ts`).
+  Push goes to the FCM topic `alerts` (HTTP v1 API, `bot/push.py`); the topic
+  and channel id `alerts` are shared with the Android app.
 - **D1 contract shared with the widget and app**: `snapshots` (plus
-  `load_pct`, `inv_status`, `status`, `dtc`, added by `ALTER TABLE` in the
-  lazy schema step), `outages`, `worker_state` (key/value: `started_ts`,
+  `load_pct`, `inv_status`, `status`, `dtc` and the dashboard kWh counters
+  `{pv,charge,discharge,import,load}_{today,total}_kwh`, added by
+  `ALTER TABLE` in the lazy schema step), `outages`, `worker_state` (key/value: `started_ts`,
   `last_ok_ts`, `last_error`, `last_error_ts`, `muted_until_ts`,
-  `battery_capacity_kwh`, `tz`, `battery_sign`) and `events` (`kind` in
+  `battery_capacity_kwh`, `tz`; a leftover `battery_sign` is deleted at startup) and `events` (`kind` in
   `EVENT_KINDS`). Renaming any of these breaks the app.
 - **`jobs/status_alerts.py`**: overload, fault (`dtc` change or `status` 3),
   battery full and solar stopped, all from one status poll. `energy_report`
@@ -109,7 +113,9 @@ the scheduler side by side until SIGINT/SIGTERM.
 - The base URL is `https://openapi.growatt.com` (`client.py`). The README's
   mention of `server.growatt.com` is outdated.
 - This inverter uses the **storage** panel endpoints, which need `plantId`:
-  `POST /panel/storage/getStorageStatusData?plantId=…` (form `storageSn`) and
+  `POST /panel/storage/getStorageStatusData?plantId=…` (form `storageSn`),
+  `POST /panel/storage/getStorageTotalData?plantId=…` (form `storageSn`; the
+  dashboard's today/total kWh, see `parsers.ENERGY_TOTAL_FIELDS`) and
   `POST /panel/storage/getStorageEnergyDayChart` (form `plantId`, `storageSn`,
   `date`). `/panel/spf/*` returns 404.
 - Login posts the MD5 of the password as `passwordCrc`, with `password` left empty.
@@ -136,8 +142,8 @@ is hand-written.
   because the project is ad-hoc signed with no team. Each target reads its own
   bundle and caches in its own `UserDefaults`.
 - Data older than 15 minutes is shown as stale, and nulls render as "n/a".
-  Battery direction isn't shown, for the same `batPower` sign reason as
-  history.
+  Battery direction isn't shown (`batPower` is unsigned; direction needs
+  the `status` column).
 
 ```bash
 cd growatt-widget
@@ -157,6 +163,11 @@ It tolerates the old schema: "no such table/column" errors become empty results.
 - Credentials: `--dart-define-from-file=secrets.json` (`accountId`,
   `databaseId`, `apiToken`, a D1 Read token). `secrets.json` is gitignored.
   `--dart-define=FAKE_DATA=true` (or `old_schema`) runs on generated data.
+- Push alerts are Android only (iOS push needs a paid Apple account).
+  `lib/core/push/push_setup.dart` initialises Firebase from the optional
+  `fcm*` keys in `secrets.json`, with no `google-services.json` or Gradle
+  plugin, and subscribes to the `alerts` topic. `MainActivity.kt` creates the
+  high-importance `alerts` channel.
 - The root `.gitignore` ignores `lib/`, so `growatt-app/.gitignore` re-includes it.
 - Flutter writes to its SDK cache, so `flutter` commands fail inside the
   Claude Code sandbox.

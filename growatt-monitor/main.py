@@ -15,6 +15,7 @@ from config import Config, ConfigError
 from growatt.client import GrowattClient
 from bot import commands as bot_commands
 from bot.notifications import Notifier
+from bot.push import FcmPusher
 from scheduler import Scheduler
 from jobs.grid_monitor import make_grid_monitor
 from jobs.energy_report import make_energy_report
@@ -46,7 +47,9 @@ async def write_startup_state(history: History, cfg: Config, started_ts: float) 
         "started_ts": int(started_ts),
         "tz": cfg.tz_name,
         "battery_capacity_kwh": cfg.battery_capacity_kwh,
-        "battery_sign": cfg.battery_sign,
+        # Retired: batPower turned out to be unsigned. Deleting it stops older
+        # app builds from labelling discharge as charge.
+        "battery_sign": None,
     }
     try:
         for key, value in values.items():
@@ -104,11 +107,15 @@ async def amain() -> None:
         application.add_handler(CommandHandler(cmd.name, cmd.handler, filters=owner_only))
     application.add_handler(MessageHandler(filters.COMMAND & owner_only, bot_commands.cmd_unknown))
 
-    notifier = Notifier(application.bot, cfg.telegram_chat_id, history)
+    pusher = None
+    if cfg.fcm_service_account_json:
+        pusher = FcmPusher(cfg.fcm_service_account_json)
+        log.info("Push alerts enabled for FCM project %s", pusher.project_id)
+    notifier = Notifier(application.bot, cfg.telegram_chat_id, history, pusher=pusher)
     bot_commands.bind(
         notifier=notifier,
         health=health,
-        settings=bot_commands.Settings(cfg.tz, cfg.battery_capacity_kwh, cfg.battery_sign),
+        settings=bot_commands.Settings(cfg.tz, cfg.battery_capacity_kwh),
     )
 
     async def unreachable_alert() -> None:
