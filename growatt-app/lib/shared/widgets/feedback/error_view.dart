@@ -25,7 +25,7 @@ class ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Something went wrong', style: typo.headingSm, textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(message, style: typo.bodyMd.copyWith(color: colors.contentSecondary), textAlign: TextAlign.center),
+            Text(message, style: typo.bodyMd.copyWith(color: colors.onSurfaceVariant), textAlign: TextAlign.center),
             if (onRetry != null) ...[
               const SizedBox(height: 24),
               TextButton(onPressed: onRetry, child: const Text('Try again')),

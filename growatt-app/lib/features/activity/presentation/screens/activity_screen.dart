@@ -4,7 +4,6 @@ import 'package:growatt_app/core/providers.dart';
 import 'package:growatt_app/features/activity/presentation/providers/activity_provider.dart';
 import 'package:growatt_app/shared/functions/formatters.dart';
 import 'package:growatt_app/shared/theme/extensions/theme_extensions.dart';
-import 'package:growatt_app/shared/theme/tokens/colors.dart';
 import 'package:growatt_app/shared/widgets/cards/section_card.dart';
 import 'package:growatt_app/shared/widgets/tab_page.dart';
 
@@ -70,11 +69,12 @@ class ActivityScreen extends ConsumerWidget {
 
   Color _eventColor(BuildContext context, String kind) {
     final c = context.colors;
+    final s = context.status;
     return switch (kind) {
-      'grid_up' || 'battery_full' => c.success,
+      'grid_up' || 'battery_full' => s.success,
       'grid_down' || 'fault' || 'unreachable' => c.error,
-      'battery_low' || 'overload' || 'solar_stopped' => c.warning,
-      _ => AppColors.accent2,
+      'battery_low' || 'overload' || 'solar_stopped' => s.warning,
+      _ => c.tertiary,
     };
   }
 }

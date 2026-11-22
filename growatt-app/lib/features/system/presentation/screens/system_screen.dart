@@ -52,7 +52,7 @@ class SystemScreen extends ConsumerWidget {
                 label: 'Latest snapshot',
                 value: ago(data.latestTs) ?? na,
                 sub: data.latestTs == null ? null : when(data.latestTs),
-                valueColor: latestStale ? context.colors.warning : null,
+                valueColor: latestStale ? context.status.warning : null,
               ),
               InfoRow(label: 'Source', value: fake ? 'Sample data' : 'Cloudflare D1 (read-only)'),
               InfoRow(label: 'Time zone', value: clock.label),

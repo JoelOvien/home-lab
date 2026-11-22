@@ -5,7 +5,7 @@ import 'package:growatt_app/shared/widgets/cards/section_card.dart';
 import 'package:growatt_app/shared/widgets/feedback/app_loader.dart';
 import 'package:growatt_app/shared/widgets/feedback/error_view.dart';
 
-/// Scrollable, pull-to-refresh tab body that clears the floating bottom nav.
+/// Scrollable, pull-to-refresh tab body.
 class TabPage extends StatelessWidget {
   const TabPage({super.key, required this.title, required this.onRefresh, required this.children});
 
@@ -15,15 +15,13 @@ class TabPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom + 100;
     return Scaffold(
-      backgroundColor: context.colors.surface,
       appBar: AppBar(title: Text(title)),
       body: RefreshIndicator(
         onRefresh: onRefresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(16, 4, 16, bottom),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           children: [
             for (final c in children) Padding(padding: const EdgeInsets.only(bottom: 12), child: c),
           ],
@@ -57,8 +55,8 @@ class AsyncTab<T> extends StatelessWidget {
           StatusBanner(
             icon: Icons.cloud_off,
             text: 'Refresh failed: ${value.error}',
-            color: context.colors.error,
-            background: context.colors.errorBackground,
+            color: context.colors.onErrorContainer,
+            background: context.colors.errorContainer,
           ),
         ...builder(data),
       ]);

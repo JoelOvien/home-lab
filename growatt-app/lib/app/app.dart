@@ -1,3 +1,4 @@
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:growatt_app/app/not_configured_screen.dart';
@@ -10,24 +11,27 @@ class GrowattApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(isConfiguredProvider)) {
-      return MaterialApp(
+    final configured = ref.watch(isConfiguredProvider);
+    return DynamicColorBuilder(builder: (lightDynamic, darkDynamic) {
+      final theme = buildTheme(lightDynamic?.harmonized() ?? fallbackScheme(Brightness.light));
+      final darkTheme = buildTheme(darkDynamic?.harmonized() ?? fallbackScheme(Brightness.dark));
+      if (!configured) {
+        return MaterialApp(
+          title: 'Growatt',
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          darkTheme: darkTheme,
+          home: const NotConfiguredScreen(),
+        );
+      }
+      return MaterialApp.router(
         title: 'Growatt',
         debugShowCheckedModeBanner: false,
-        theme: buildLightTheme(),
-        darkTheme: buildDarkTheme(),
-        themeMode: ThemeMode.dark,
-        home: const NotConfiguredScreen(),
+        theme: theme,
+        darkTheme: darkTheme,
+        scaffoldMessengerKey: scaffoldMessengerKey,
+        routerConfig: ref.watch(routerProvider),
       );
-    }
-    return MaterialApp.router(
-      title: 'Growatt',
-      debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.dark,
-      scaffoldMessengerKey: scaffoldMessengerKey,
-      routerConfig: ref.watch(routerProvider),
-    );
+    });
   }
 }

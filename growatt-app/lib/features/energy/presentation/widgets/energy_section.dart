@@ -52,7 +52,7 @@ class _EnergyTile extends StatelessWidget {
     final typo = context.typography;
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: colors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: colors.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
@@ -61,7 +61,7 @@ class _EnergyTile extends StatelessWidget {
             child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: typo.bodySm.copyWith(color: colors.contentSecondary))),
+          Expanded(child: Text(label, style: typo.bodySm.copyWith(color: colors.onSurfaceVariant))),
         ]),
         const SizedBox(height: 10),
         Text(formatKwh1(value.today), style: typo.headingMd.copyWith(color: color)),

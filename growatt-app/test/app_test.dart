@@ -25,6 +25,9 @@ Future<void> pumpApp(WidgetTester tester, List overrides, {Map<String, Object> p
   await tester.pumpAndSettle();
 }
 
+Finder navTab(String label) =>
+    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+
 class _FailingSource implements D1Source {
   @override
   Future<List<D1Row>> query(String sql, [List<Object?> params = const []]) async =>
@@ -99,13 +102,13 @@ void main() {
       d1SourceProvider.overrideWithValue(FakeD1Source()),
     ]);
     expect(find.text('Photovoltaic output'), findsNothing);
-    expect(find.text('ENERGY TODAY'), findsOneWidget);
+    expect(find.text('Energy today'), findsOneWidget);
     expect(find.text('6.10 kWh'), findsOneWidget);
     expect(find.text('3.60 kWh'), findsOneWidget);
     expect(find.text('4.70 kWh'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.energy_savings_leaf_outlined));
+    await tester.tap(navTab('Energy'));
     await tester.pumpAndSettle();
-    expect(find.text('TODAY AND TOTAL'), findsOneWidget);
+    expect(find.text('Today and total'), findsOneWidget);
     expect(find.text('Photovoltaic output'), findsOneWidget);
     expect(find.text('6.1 kWh'), findsOneWidget);
     expect(find.text('Total 131.2 kWh'), findsOneWidget);
@@ -120,8 +123,8 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source(oldSchema: true)),
     ]);
-    expect(find.text('ENERGY TODAY'), findsNothing);
-    await tester.tap(find.byIcon(Icons.energy_savings_leaf_outlined));
+    expect(find.text('Energy today'), findsNothing);
+    await tester.tap(navTab('Energy'));
     await tester.pumpAndSettle();
     expect(find.text('Not recorded yet'), findsOneWidget);
     expect(find.text('Photovoltaic output'), findsNothing);
@@ -135,7 +138,7 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source()),
     ]);
-    await tester.tap(find.byIcon(Icons.show_chart));
+    await tester.tap(navTab('Charts'));
     await tester.pumpAndSettle();
     expect(find.text('6.1'), findsOneWidget);
     expect(find.text('3.6'), findsOneWidget);
@@ -148,8 +151,8 @@ void main() {
       isConfiguredProvider.overrideWithValue(true),
       d1SourceProvider.overrideWithValue(FakeD1Source()),
     ]);
-    for (final icon in [Icons.energy_savings_leaf_outlined, Icons.show_chart, Icons.history, Icons.dns_outlined]) {
-      await tester.tap(find.byIcon(icon));
+    for (final label in ['Energy', 'Charts', 'Activity', 'System']) {
+      await tester.tap(navTab(label));
       await tester.pumpAndSettle();
     }
     expect(find.text('Uptime'), findsOneWidget);

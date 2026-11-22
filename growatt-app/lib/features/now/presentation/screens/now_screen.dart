@@ -40,15 +40,15 @@ class NowScreen extends ConsumerWidget {
         StatusBanner(
           icon: Icons.cloud_off,
           text: 'Refresh failed, showing saved data. ${view.error}',
-          color: colors.error,
-          background: colors.errorBackground,
+          color: colors.onErrorContainer,
+          background: colors.errorContainer,
         ),
       if (state.isMuted(now))
         StatusBanner(
           icon: Icons.notifications_off_outlined,
           text: 'Alerts muted until ${formatClock(clock.at(state.mutedUntilTs!))}',
-          color: colors.warning,
-          background: colors.primaryMuted,
+          color: context.status.onWarningContainer,
+          background: context.status.warningContainer,
         ),
       _GridCard(snapshot: s, outage: openOutage, now: now),
       _MetricGrid(snapshot: s, flow: flow),
@@ -115,7 +115,7 @@ class _UpdatedLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final stale = snapshot.isStale(now);
     final age = now.difference(DateTime.fromMillisecondsSinceEpoch(snapshot.ts * 1000));
-    final color = stale ? context.colors.warning : context.colors.contentSecondary;
+    final color = stale ? context.status.warning : context.colors.onSurfaceVariant;
     return Row(children: [
       Icon(stale ? Icons.warning_amber_rounded : Icons.schedule, size: 16, color: color),
       const SizedBox(width: 6),
@@ -138,9 +138,9 @@ class _GridCard extends StatelessWidget {
     final colors = context.colors;
     final present = snapshot?.gridPresent;
     final (icon, title, color, bg) = switch (present) {
-      true => (Icons.power, 'Grid on', colors.success, colors.successBackground),
-      false => (Icons.power_off, 'Grid down', colors.error, colors.errorBackground),
-      null => (Icons.help_outline, 'Grid $na', colors.contentSecondary, colors.surfaceMuted),
+      true => (Icons.power, 'Grid on', context.status.onSuccessContainer, context.status.successContainer),
+      false => (Icons.power_off, 'Grid down', colors.onErrorContainer, colors.errorContainer),
+      null => (Icons.help_outline, 'Grid $na', colors.onSurfaceVariant, colors.surfaceContainerHighest),
     };
     final sub = switch (present) {
       true => formatVolts(snapshot?.gridV),
@@ -156,7 +156,7 @@ class _GridCard extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: context.typography.headingLg.copyWith(color: color)),
-            if (sub != null) Text(sub, style: context.typography.bodyMd),
+            if (sub != null) Text(sub, style: context.typography.bodyMd.copyWith(color: color)),
           ]),
         ),
       ]),
@@ -174,30 +174,37 @@ class _MetricGrid extends StatelessWidget {
     final s = snapshot;
     final battery = formatBatteryFlow(flow);
     final tiles = [
-      MetricTile(icon: Icons.wb_sunny_outlined, label: 'SOLAR', value: formatWatts(s?.pvW)),
+      MetricTile(icon: Icons.wb_sunny_outlined, label: 'Solar', value: formatWatts(s?.pvW)),
       MetricTile(
         icon: Icons.bolt,
-        label: 'LOAD',
+        label: 'Load',
         value: formatWatts(s?.loadW),
         sub: s?.loadPct == null ? null : '${formatPercent(s!.loadPct)} of rated',
       ),
       MetricTile(
         icon: Icons.battery_charging_full,
-        label: 'BATTERY',
+        label: 'Battery',
         value: formatPercent(s?.soc),
         sub: [formatVolts(s?.batteryV), if (battery != null) battery].join(' · '),
       ),
       MetricTile(
         icon: Icons.electrical_services,
-        label: 'GRID',
+        label: 'Grid',
         value: formatVolts(s?.gridV),
         sub: s?.gridW == null ? null : formatWatts(s!.gridW),
       ),
     ];
+    Widget row(Widget a, Widget b) => IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(child: a),
+            const SizedBox(width: 12),
+            Expanded(child: b),
+          ]),
+        );
     return Column(children: [
-      Row(children: [Expanded(child: tiles[0]), const SizedBox(width: 12), Expanded(child: tiles[1])]),
+      row(tiles[0], tiles[1]),
       const SizedBox(height: 12),
-      Row(children: [Expanded(child: tiles[2]), const SizedBox(width: 12), Expanded(child: tiles[3])]),
+      row(tiles[2], tiles[3]),
     ]);
   }
 }

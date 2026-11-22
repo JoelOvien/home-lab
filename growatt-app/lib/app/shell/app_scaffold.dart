@@ -5,7 +5,6 @@ import 'package:growatt_app/app/shell/app_bottom_nav.dart';
 import 'package:growatt_app/features/activity/presentation/providers/activity_provider.dart';
 import 'package:growatt_app/features/charts/presentation/providers/charts_provider.dart';
 import 'package:growatt_app/features/system/presentation/providers/system_provider.dart';
-import 'package:growatt_app/shared/theme/extensions/theme_extensions.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -57,18 +56,16 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
-      backgroundColor: context.colors.surface,
       body: widget.navigationShell,
       bottomNavigationBar: AppBottomNav(
         currentIndex: widget.navigationShell.currentIndex,
         onTap: _onTap,
         tabs: const [
-          (icon: Icons.bolt, label: 'Now'),
-          (icon: Icons.energy_savings_leaf_outlined, label: 'Energy'),
-          (icon: Icons.show_chart, label: 'Charts'),
-          (icon: Icons.history, label: 'Activity'),
-          (icon: Icons.dns_outlined, label: 'System'),
+          (icon: Icons.bolt_outlined, selectedIcon: Icons.bolt, label: 'Now'),
+          (icon: Icons.energy_savings_leaf_outlined, selectedIcon: Icons.energy_savings_leaf, label: 'Energy'),
+          (icon: Icons.insights_outlined, selectedIcon: Icons.insights, label: 'Charts'),
+          (icon: Icons.history, selectedIcon: Icons.history, label: 'Activity'),
+          (icon: Icons.dns_outlined, selectedIcon: Icons.dns, label: 'System'),
         ],
       ),
     );

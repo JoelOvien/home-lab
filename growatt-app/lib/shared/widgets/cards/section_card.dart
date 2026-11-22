@@ -17,11 +17,11 @@ class SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(title.toUpperCase(), style: context.typography.label)),
+              Expanded(child: Text(title, style: context.typography.headingSm.copyWith(color: context.colors.primary))),
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           child,
         ],
       ),
@@ -45,7 +45,7 @@ class InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: typo.bodyMd.copyWith(color: context.colors.contentSecondary))),
+          Expanded(child: Text(label, style: typo.bodyMd.copyWith(color: context.colors.onSurfaceVariant))),
           const SizedBox(width: 12),
           Flexible(
             child: Align(
@@ -78,18 +78,20 @@ class MetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final typo = context.typography;
+    final on = colors.onSecondaryContainer;
     return AppCard(
+      color: colors.secondaryContainer,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(icon, size: 18, color: color ?? colors.primary),
+            Icon(icon, size: 18, color: color ?? on),
             const SizedBox(width: 6),
-            Text(label, style: typo.label),
+            Text(label, style: typo.label.copyWith(color: on)),
           ]),
           const SizedBox(height: 8),
-          Text(value, style: typo.displaySm, maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(sub ?? ' ', style: typo.caption, maxLines: 2),
+          Text(value, style: typo.displaySm.copyWith(color: on), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(sub ?? ' ', style: typo.caption.copyWith(color: on.withValues(alpha: 0.8)), maxLines: 2),
         ],
       ),
     );
@@ -110,7 +112,7 @@ class StatusBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(12)),
       child: Row(children: [
-        Icon(icon, size: 18, color: color),
+        Icon(icon, size: 20, color: color),
         const SizedBox(width: 8),
         Expanded(child: Text(text, style: context.typography.bodySm.copyWith(color: color))),
       ]),

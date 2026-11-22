@@ -7,6 +7,7 @@ import 'package:growatt_app/core/inverter/models.dart';
 import 'package:growatt_app/features/charts/presentation/providers/charts_provider.dart';
 import 'package:growatt_app/shared/functions/formatters.dart';
 import 'package:growatt_app/shared/theme/extensions/theme_extensions.dart';
+import 'package:growatt_app/shared/theme/tokens/colors.dart';
 import 'package:growatt_app/shared/widgets/cards/section_card.dart';
 import 'package:growatt_app/shared/widgets/tab_page.dart';
 
@@ -31,7 +32,6 @@ class _ChartsScreenState extends ConsumerState<ChartsScreen> {
       builder: (data) {
         final start = _range == _Range.today ? data.startOfToday : data.nowTs - 86400;
         final points = data.since(start);
-        final colors = context.colors;
         return [
           SegmentedButton<_Range>(
             segments: const [
@@ -39,22 +39,18 @@ class _ChartsScreenState extends ConsumerState<ChartsScreen> {
               ButtonSegment(value: _Range.last24h, label: Text('Last 24h')),
             ],
             selected: {_range},
-            style: SegmentedButton.styleFrom(
-              selectedBackgroundColor: colors.primary,
-              selectedForegroundColor: Colors.black,
-            ),
             onSelectionChanged: (s) => setState(() => _range = s.first),
           ),
           SectionCard(
             title: 'Load vs solar',
-            trailing: _Legend(items: [('Load', colors.accent2), ('Solar', colors.primary)]),
+            trailing: _Legend(items: [('Load', AppColors.energyLoad), ('Solar', AppColors.energyPv)]),
             child: _TimeChart(
               clock: data.clock,
               start: start,
               end: data.nowTs,
               series: [
-                (points.map((p) => (p.ts, p.loadW)).toList(), colors.accent2),
-                (points.map((p) => (p.ts, p.pvW)).toList(), colors.primary),
+                (points.map((p) => (p.ts, p.loadW)).toList(), AppColors.energyLoad),
+                (points.map((p) => (p.ts, p.pvW)).toList(), AppColors.energyPv),
               ],
               formatY: (v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : v.round().toString(),
             ),
@@ -67,7 +63,7 @@ class _ChartsScreenState extends ConsumerState<ChartsScreen> {
               end: data.nowTs,
               minY: 0,
               maxY: 100,
-              series: [(points.map((p) => (p.ts, p.soc)).toList(), colors.success)],
+              series: [(points.map((p) => (p.ts, p.soc)).toList(), context.status.success)],
               formatY: (v) => '${v.round()}%',
             ),
           ),
@@ -162,7 +158,7 @@ class _TimeChart extends StatelessWidget {
           borderData: FlBorderData(show: false),
           gridData: FlGridData(
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(color: colors.borderMuted, strokeWidth: 1),
+            getDrawingHorizontalLine: (_) => FlLine(color: colors.outlineVariant, strokeWidth: 1),
           ),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(),
@@ -268,12 +264,12 @@ class _HealthChart extends StatelessWidget {
           borderData: FlBorderData(show: false),
           gridData: FlGridData(
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(color: colors.borderMuted, strokeWidth: 1),
+            getDrawingHorizontalLine: (_) => FlLine(color: colors.outlineVariant, strokeWidth: 1),
           ),
           lineBarsData: [
             LineChartBarData(
               spots: [for (final (i, w) in weeks.indexed) FlSpot(i.toDouble(), w.volts)],
-              color: colors.success,
+              color: context.status.success,
               barWidth: 2,
             ),
           ],
