@@ -168,6 +168,11 @@ It tolerates the old schema: "no such table/column" errors become empty results.
   `fcm*` keys in `secrets.json`, with no `google-services.json` or Gradle
   plugin, and subscribes to the `alerts` topic. `MainActivity.kt` creates the
   high-importance `alerts` channel.
+- Android home screen widget: `StatusWidgetProvider.kt` (RemoteViews,
+  `res/layout/status_widget.xml`) shows strings that
+  `lib/core/widget/home_widget_sync.dart` saves with `home_widget`. They are
+  pushed after each successful Now refresh and by a 15-minute `workmanager`
+  task that reads D1 headlessly. There is no iOS widget yet.
 - The root `.gitignore` ignores `lib/`, so `growatt-app/.gitignore` re-includes it.
 - Flutter writes to its SDK cache, so `flutter` commands fail inside the
   Claude Code sandbox.

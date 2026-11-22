@@ -19,6 +19,8 @@ dependencies:
   timezone: ^0.10.1
   firebase_core: ^5.2.0
   firebase_messaging: ^17.1.0
+  home_widget: ^0.10.0
+  workmanager: ^0.10.10
 
 dev_dependencies:
   flutter_test:

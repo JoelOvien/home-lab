@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:growatt_app/core/inverter/inverter_repository.dart';
 import 'package:growatt_app/core/providers.dart';
+import 'package:growatt_app/core/widget/home_widget_sync.dart';
 
 class NowView {
   const NowView({required this.data, this.error});
@@ -49,6 +50,7 @@ class NowNotifier extends AsyncNotifier<NowView> {
     try {
       final (data, row) = await ref.read(repositoryProvider).now();
       await prefs.setString(_cacheKey, jsonEncode(data.toJson(row)));
+      unawaited(pushToHomeWidget(data.snapshot));
       return NowView(data: data);
     } catch (e) {
       final raw = prefs.getString(_cacheKey);
