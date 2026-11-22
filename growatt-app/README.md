@@ -51,6 +51,28 @@ with only **D1 Read** permission, such as the one the macOS widget uses.
 `--dart-define-from-file`. A build without them opens a "Not configured"
 screen.
 
+### Push alerts (Android only)
+
+The `fcm*` keys are optional. With them set, the Android app subscribes to the
+worker's alerts and shows them as notifications, even when the app is closed.
+iOS push needs a paid Apple Developer account, so iOS ignores these keys.
+
+1. Register the Android app in the Firebase project (`home-lab-5e67c`):
+
+   ```bash
+   firebase apps:create ANDROID "Growatt" --package-name com.homelab.growatt_app --project home-lab-5e67c
+   firebase apps:sdkconfig ANDROID <app id from above> --project home-lab-5e67c
+   ```
+
+2. From that config, copy `client[0].api_key[0].current_key` to `fcmApiKey`,
+   `client[0].client_info.mobilesdk_app_id` to `fcmAppId`,
+   `project_info.project_number` to `fcmSenderId` and
+   `project_info.project_id` to `fcmProjectId` in `secrets.json`. Don't add a
+   `google-services.json` to the app.
+3. In Project settings, Service accounts, generate a private key and set its
+   whole JSON as `FCM_SERVICE_ACCOUNT_JSON` on the worker in Railway.
+4. Rebuild and open the app once, and allow notifications.
+
 ```bash
 flutter pub get
 flutter run --dart-define-from-file=secrets.json

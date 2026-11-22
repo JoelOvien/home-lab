@@ -59,4 +59,10 @@ class AppColors {
   static const Color darkErrorBackground = Color(0xFF3A2020);
   static const Color darkSuccessBackground = Color(0xFF1E2E24);
 
+  // ── Energy tiles (readable on both surfaces) ─────────────────────────────
+  static const Color energyPv = Color(0xFF14B8A6);
+  static const Color energyDischarge = Color(0xFF3B82F6);
+  static const Color energyCharge = Color(0xFF8B5CF6);
+  static const Color energyImport = Color(0xFFF59E0B);
+  static const Color energyLoad = Color(0xFFF97316);
 }

@@ -73,7 +73,10 @@ class _ChartsScreenState extends ConsumerState<ChartsScreen> {
           ),
           SectionCard(
             title: 'Energy',
-            child: _EnergyTable(rows: [('Today', data.today), ('7 days', data.week), ('30 days', data.month)]),
+            child: _EnergyTable(
+              rows: [('Today', data.today), ('7 days', data.week), ('30 days', data.month)],
+              exactToday: data.exactToday,
+            ),
           ),
           SectionCard(title: 'Battery health', child: _HealthChart(weeks: data.health, clock: data.clock)),
         ];
@@ -190,11 +193,13 @@ class _TimeChart extends StatelessWidget {
   }
 }
 
-String _kwh(Energy e) => e.coveredSeconds == 0 ? na : e.kwh.toStringAsFixed(1);
+String _kwh(Energy e, [double? exact]) =>
+    exact != null ? exact.toStringAsFixed(1) : e.coveredSeconds == 0 ? na : e.kwh.toStringAsFixed(1);
 
 class _EnergyTable extends StatelessWidget {
-  const _EnergyTable({required this.rows});
+  const _EnergyTable({required this.rows, required this.exactToday});
   final List<(String, EnergySplit)> rows;
+  final EnergyCounters exactToday;
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +207,9 @@ class _EnergyTable extends StatelessWidget {
     final head = typo.caption;
     final cell = typo.bodyMd.copyWith(fontWeight: FontWeight.w600);
     Widget num(String s, TextStyle style) => Text(s, textAlign: TextAlign.end, style: style);
+    final x = exactToday;
+    final exact = x.load.today != null && x.pv.today != null && x.import.today != null;
+    final estimated = exact ? rows.skip(1) : rows;
     return Column(children: [
       Table(
         columnWidths: const {0: FlexColumnWidth(1.2)},
@@ -212,12 +220,12 @@ class _EnergyTable extends StatelessWidget {
             num('Solar', head),
             num('Grid', head),
           ]),
-          for (final (label, e) in rows)
+          for (final (i, (label, e)) in rows.indexed)
             TableRow(children: [
               Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text(label, style: typo.bodyMd)),
-              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.load), cell)),
-              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.pv), cell)),
-              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.grid), cell)),
+              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.load, i == 0 ? x.load.today : null), cell)),
+              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.pv, i == 0 ? x.pv.today : null), cell)),
+              Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: num(_kwh(e.grid, i == 0 ? x.import.today : null), cell)),
             ]),
         ],
       ),
@@ -225,7 +233,9 @@ class _EnergyTable extends StatelessWidget {
       Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          'kWh. Data covers ${[for (final (l, e) in rows) '${(e.load.coverage(e.window) * 100).round()}% of $l'].join(', ')}. '
+          '${exact ? "kWh. Today is Growatt's own counter, the same as the Now tab. Other rows are" : 'kWh,'} '
+          'estimated from 5-minute snapshots, covering '
+          '${[for (final (l, e) in estimated) '${(e.load.coverage(e.window) * 100).round()}% of $l'].join(', ')}. '
           'Gaps over 15 min are skipped.',
           style: typo.caption,
         ),

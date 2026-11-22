@@ -52,3 +52,7 @@ app.*.map.json
 
 # D1 credentials passed via --dart-define-from-file
 secrets.json
+
+# Firebase config; its values go in secrets.json instead
+google-services.json
+GoogleService-Info.plist

@@ -51,6 +51,11 @@ class InverterRepository {
     );
   }
 
+  Future<Snapshot?> latestSnapshot() async {
+    final row = (await db.query('SELECT * FROM snapshots ORDER BY ts DESC LIMIT 1')).firstOrNull;
+    return row == null ? null : Snapshot.fromRow(row);
+  }
+
   Future<WorkerState> workerState() async =>
       WorkerState.fromRows(await db.query('SELECT key, value FROM worker_state'));
 

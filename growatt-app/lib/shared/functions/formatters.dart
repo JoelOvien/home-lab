@@ -1,3 +1,4 @@
+import 'package:growatt_app/core/inverter/models.dart';
 import 'package:intl/intl.dart';
 
 const na = 'n/a';
@@ -41,3 +42,9 @@ String formatClock(DateTime t) => DateFormat('HH:mm').format(t);
 String formatDateTime(DateTime t) => DateFormat('d MMM HH:mm').format(t);
 
 String formatDate(DateTime t) => DateFormat('d MMM').format(t);
+
+String? formatBatteryFlow(BatteryFlow flow) => switch (flow.direction) {
+      BatteryDirection.charging => 'Charging ${formatWatts(flow.chargeW)}',
+      BatteryDirection.discharging => 'Discharging ${formatWatts(flow.dischargeW)}',
+      null => null,
+    };

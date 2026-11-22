@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:growatt_app/app/not_configured_screen.dart';
 import 'package:growatt_app/core/providers.dart';
+import 'package:growatt_app/core/push/push_setup.dart';
 import 'package:growatt_app/shared/theme/app_theme.dart';
 
 class GrowattApp extends ConsumerWidget {
@@ -25,6 +26,7 @@ class GrowattApp extends ConsumerWidget {
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: ThemeMode.dark,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       routerConfig: ref.watch(routerProvider),
     );
   }

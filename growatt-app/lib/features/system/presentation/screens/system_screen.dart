@@ -60,17 +60,7 @@ class SystemScreen extends ConsumerWidget {
           ),
           SectionCard(
             title: 'Battery settings',
-            child: Column(children: [
-              InfoRow(label: 'Capacity', value: formatKwh(s.batteryCapacityKwh)),
-              InfoRow(
-                label: 'Power sign',
-                value: switch (s.batterySign) {
-                  BatterySign.chargePositive => 'Positive = charging',
-                  BatterySign.chargeNegative => 'Negative = charging',
-                  null => 'Unknown (direction hidden)',
-                },
-              ),
-            ]),
+            child: InfoRow(label: 'Capacity', value: formatKwh(s.batteryCapacityKwh)),
           ),
         ];
       },

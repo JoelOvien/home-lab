@@ -46,7 +46,22 @@ class FakeD1Source implements D1Source {
       'grid_present': oldSchema ? 0 : 1,
     };
     if (!oldSchema) {
-      row.addAll({'load_pct': 13.7, 'inv_status': -10, 'status': 8, 'dtc': 20006});
+      row.addAll({
+        'load_pct': 13.7,
+        'inv_status': -10,
+        'status': 8,
+        'dtc': 20006,
+        'pv_today_kwh': 3.6,
+        'pv_total_kwh': 3.7,
+        'discharge_today_kwh': 1.4,
+        'discharge_total_kwh': 7.0,
+        'charge_today_kwh': 3.7,
+        'charge_total_kwh': 65.5,
+        'import_today_kwh': 4.7,
+        'import_total_kwh': 131.2,
+        'load_today_kwh': 6.1,
+        'load_total_kwh': 73.8,
+      });
     }
     return row;
   }
@@ -59,7 +74,6 @@ class FakeD1Source implements D1Source {
         {'key': 'muted_until_ts', 'value': '${now + 90 * 60}'},
         {'key': 'battery_capacity_kwh', 'value': '5'},
         {'key': 'tz', 'value': 'Africa/Lagos'},
-        {'key': 'battery_sign', 'value': 'charge_positive'},
       ];
 
   List<D1Row> _events(int now) => [

@@ -5,6 +5,7 @@ import 'package:growatt_app/core/inverter/inverter_repository.dart';
 import 'package:growatt_app/core/inverter/models.dart';
 import 'package:growatt_app/core/providers.dart';
 import 'package:growatt_app/features/now/presentation/providers/now_notifier.dart';
+import 'package:growatt_app/features/now/presentation/widgets/energy_section.dart';
 import 'package:growatt_app/shared/functions/formatters.dart';
 import 'package:growatt_app/shared/theme/extensions/theme_extensions.dart';
 import 'package:growatt_app/shared/widgets/cards/section_card.dart';
@@ -29,6 +30,7 @@ class NowScreen extends ConsumerWidget {
     final NowData(:snapshot, :openOutage, :state) = view.data;
     final clock = ZoneClock.named(state.tz);
     final s = snapshot;
+    final flow = BatteryFlow.of(s);
 
     return [
       if (s == null)
@@ -50,16 +52,28 @@ class NowScreen extends ConsumerWidget {
           background: colors.primaryMuted,
         ),
       _GridCard(snapshot: s, outage: openOutage, now: now),
-      _MetricGrid(snapshot: s, sign: state.batterySign),
-      SectionCard(title: 'Flow', child: Text(_flowLine(s, state.batterySign), style: context.typography.bodyMd)),
+      _MetricGrid(snapshot: s, flow: flow),
+      SectionCard(title: 'Flow', child: Text(_flowLine(s, flow), style: context.typography.bodyMd)),
       SectionCard(
-        title: 'Battery runtime',
-        child: InfoRow(
-          label: 'At current load',
-          value: formatHours(runtimeHours(soc: s?.soc, capacityKwh: state.batteryCapacityKwh, loadW: s?.loadW)),
-          sub: state.batteryCapacityKwh == null ? 'Set BATTERY_CAPACITY_KWH on the worker' : null,
-        ),
+        title: 'Battery',
+        child: Column(children: [
+          InfoRow(label: 'Charge power', value: formatWatts(flow.chargeW)),
+          InfoRow(label: 'Discharge power', value: formatWatts(flow.dischargeW)),
+          InfoRow(
+            label: 'Runtime at current load',
+            value: flow.direction == BatteryDirection.charging
+                ? 'Charging'
+                : formatHours(runtimeHours(
+                    soc: s?.soc,
+                    capacityKwh: state.batteryCapacityKwh,
+                    loadW: s?.loadW,
+                    direction: flow.direction,
+                  )),
+            sub: state.batteryCapacityKwh == null ? 'Set BATTERY_CAPACITY_KWH on the worker' : null,
+          ),
+        ]),
       ),
+      if (s != null && !s.energy.isEmpty) EnergySection(counters: s.energy),
       if (s != null && (s.invStatus != null || s.status != null || s.dtc != null))
         SectionCard(
           title: 'Inverter',
@@ -81,22 +95,14 @@ class NowScreen extends ConsumerWidget {
   }
 }
 
-String _batteryLabel(double? batteryW, BatterySign? sign) =>
-    switch (batteryDirection(batteryW, sign)) {
-      BatteryDirection.charging => 'charging ${formatWatts(batteryW!.abs())}',
-      BatteryDirection.discharging => 'discharging ${formatWatts(batteryW!.abs())}',
-      BatteryDirection.idle => 'idle',
-      null => '',
-    };
-
-String _flowLine(Snapshot? s, BatterySign? sign) {
+String _flowLine(Snapshot? s, BatteryFlow flow) {
   final parts = [
     'Solar ${formatWatts(s?.pvW)}',
     'Load ${formatWatts(s?.loadW)}',
     'Grid ${formatWatts(s?.gridW)}',
   ];
-  final battery = _batteryLabel(s?.batteryW, sign);
-  if (battery.isNotEmpty) parts.add('Battery $battery');
+  final battery = formatBatteryFlow(flow);
+  if (battery != null) parts.add('Battery ${battery[0].toLowerCase()}${battery.substring(1)}');
   return parts.join('  ·  ');
 }
 
@@ -159,14 +165,14 @@ class _GridCard extends StatelessWidget {
 }
 
 class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.snapshot, required this.sign});
+  const _MetricGrid({required this.snapshot, required this.flow});
   final Snapshot? snapshot;
-  final BatterySign? sign;
+  final BatteryFlow flow;
 
   @override
   Widget build(BuildContext context) {
     final s = snapshot;
-    final battery = _batteryLabel(s?.batteryW, sign);
+    final battery = formatBatteryFlow(flow);
     final tiles = [
       MetricTile(icon: Icons.wb_sunny_outlined, label: 'SOLAR', value: formatWatts(s?.pvW)),
       MetricTile(
@@ -179,7 +185,7 @@ class _MetricGrid extends StatelessWidget {
         icon: Icons.battery_charging_full,
         label: 'BATTERY',
         value: formatPercent(s?.soc),
-        sub: [formatVolts(s?.batteryV), if (battery.isNotEmpty) battery].join(' · '),
+        sub: [formatVolts(s?.batteryV), if (battery != null) battery].join(' · '),
       ),
       MetricTile(
         icon: Icons.electrical_services,

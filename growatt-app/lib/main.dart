@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:growatt_app/app/app.dart';
 import 'package:growatt_app/core/providers.dart';
+import 'package:growatt_app/core/push/push_setup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 
@@ -17,4 +20,5 @@ Future<void> main() async {
       child: const GrowattApp(),
     ),
   );
+  unawaited(setupPush());
 }

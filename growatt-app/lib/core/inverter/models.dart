@@ -31,12 +31,14 @@ class Snapshot {
     this.invStatus,
     this.status,
     this.dtc,
+    this.energy = EnergyCounters.empty,
   });
 
   final int ts;
   final double? pvW, loadW, gridW, batteryW, soc, batteryV, gridV, loadPct;
   final bool? gridPresent;
   final int? invStatus, status, dtc;
+  final EnergyCounters energy;
 
   static Snapshot? fromRow(D1Row r) {
     final ts = asInt(r['ts']);
@@ -56,11 +58,46 @@ class Snapshot {
       invStatus: asInt(r['inv_status']),
       status: asInt(r['status']),
       dtc: asInt(r['dtc']),
+      energy: EnergyCounters.fromRow(r),
     );
   }
 
   bool isStale(DateTime now) =>
       now.difference(DateTime.fromMillisecondsSinceEpoch(ts * 1000)) > staleAfter;
+}
+
+class TodayTotal {
+  const TodayTotal(this.today, this.total);
+  final double? today, total;
+  bool get isEmpty => today == null && total == null;
+}
+
+/// Growatt's own kWh counters (getStorageTotalData), recorded on each snapshot.
+class EnergyCounters {
+  const EnergyCounters({
+    this.pv = const TodayTotal(null, null),
+    this.discharge = const TodayTotal(null, null),
+    this.charge = const TodayTotal(null, null),
+    this.import = const TodayTotal(null, null),
+    this.load = const TodayTotal(null, null),
+  });
+  static const empty = EnergyCounters();
+
+  final TodayTotal pv, discharge, charge, import, load;
+
+  factory EnergyCounters.fromRow(D1Row r) {
+    TodayTotal pair(String name) =>
+        TodayTotal(asDouble(r['${name}_today_kwh']), asDouble(r['${name}_total_kwh']));
+    return EnergyCounters(
+      pv: pair('pv'),
+      discharge: pair('discharge'),
+      charge: pair('charge'),
+      import: pair('import'),
+      load: pair('load'),
+    );
+  }
+
+  bool get isEmpty => [pv, discharge, charge, import, load].every((c) => c.isEmpty);
 }
 
 class Outage {
@@ -92,9 +129,7 @@ class InverterEvent {
   }
 }
 
-enum BatterySign { chargePositive, chargeNegative }
-
-enum BatteryDirection { charging, discharging, idle }
+enum BatteryDirection { charging, discharging }
 
 class WorkerState {
   const WorkerState(this.values);
@@ -115,30 +150,44 @@ class WorkerState {
   double? get batteryCapacityKwh => asDouble(values['battery_capacity_kwh']);
   String? get tz => values['tz'];
 
-  BatterySign? get batterySign => switch (values['battery_sign']) {
-        'charge_positive' => BatterySign.chargePositive,
-        'charge_negative' => BatterySign.chargeNegative,
-        _ => null,
-      };
-
   bool isMuted(DateTime now) {
     final until = mutedUntilTs;
     return until != null && until * 1000 > now.millisecondsSinceEpoch;
   }
 }
 
-/// Null unless the worker has confirmed which sign of `batPower` means charging.
-BatteryDirection? batteryDirection(double? batteryW, BatterySign? sign) {
-  if (batteryW == null || sign == null) return null;
-  if (batteryW.abs() < 10) return BatteryDirection.idle;
-  final positiveIsCharge = sign == BatterySign.chargePositive;
-  return (batteryW > 0) == positiveIsCharge
-      ? BatteryDirection.charging
-      : BatteryDirection.discharging;
+const _dischargingStatus = 2;
+const _chargingStatuses = {5, 6, 7, 8, 9, 10};
+
+/// `batPower` is a magnitude in both directions on this inverter, so the
+/// direction comes from the SPF `status` code, the same mapping as the bot's
+/// /flow. Any other code (standby, bypass, fault, 12 = both) is unknown.
+BatteryDirection? batteryDirection(int? status) {
+  if (status == _dischargingStatus) return BatteryDirection.discharging;
+  if (_chargingStatuses.contains(status)) return BatteryDirection.charging;
+  return null;
 }
 
-/// Hours left at the current load, from SOC × capacity ÷ load.
-double? runtimeHours({double? soc, double? capacityKwh, double? loadW}) {
+class BatteryFlow {
+  const BatteryFlow(this.direction, this.chargeW, this.dischargeW);
+  final BatteryDirection? direction;
+  final double? chargeW, dischargeW;
+
+  factory BatteryFlow.of(Snapshot? s) {
+    final direction = batteryDirection(s?.status);
+    final w = s?.batteryW?.abs() ?? 0;
+    return switch (direction) {
+      BatteryDirection.charging => BatteryFlow(direction, w, 0),
+      BatteryDirection.discharging => BatteryFlow(direction, 0, w),
+      null => const BatteryFlow(null, null, null),
+    };
+  }
+}
+
+/// Hours left at the current load, from SOC × capacity ÷ load. Only while the
+/// battery is discharging, since otherwise it isn't running down.
+double? runtimeHours({double? soc, double? capacityKwh, double? loadW, BatteryDirection? direction}) {
+  if (direction != BatteryDirection.discharging) return null;
   if (soc == null || capacityKwh == null || loadW == null || loadW <= 0) return null;
   return soc / 100 * capacityKwh / (loadW / 1000);
 }

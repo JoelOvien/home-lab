@@ -8,6 +8,7 @@ import 'package:growatt_app/core/d1/d1_client.dart';
 import 'package:growatt_app/core/d1/d1_source.dart';
 import 'package:growatt_app/core/inverter/inverter_repository.dart';
 import 'package:growatt_app/core/inverter/models.dart';
+import 'package:growatt_app/shared/functions/formatters.dart';
 
 Map<String, dynamic> ok(List<Map<String, dynamic>> rows) => {
       'success': true,
@@ -117,6 +118,29 @@ void main() {
       expect(s.loadPct, isNull);
       expect(s.invStatus, isNull);
       expect(s.dtc, isNull);
+      expect(s.energy.isEmpty, isTrue);
+    });
+
+    test('energy counters are read and stay null when missing', () {
+      final s = Snapshot.fromRow({
+        'ts': 1,
+        'pv_today_kwh': 3.6, 'pv_total_kwh': '3.7',
+        'discharge_today_kwh': 1.4, 'discharge_total_kwh': 7,
+        'charge_today_kwh': 3.7, 'charge_total_kwh': 65.5,
+        'import_today_kwh': 4.7, 'import_total_kwh': 131.2,
+        'load_today_kwh': null, 'load_total_kwh': 73.8,
+      })!;
+      final e = s.energy;
+      expect(e.isEmpty, isFalse);
+      expect((e.pv.today, e.pv.total), (3.6, 3.7));
+      expect((e.discharge.today, e.discharge.total), (1.4, 7.0));
+      expect((e.charge.today, e.charge.total), (3.7, 65.5));
+      expect((e.import.today, e.import.total), (4.7, 131.2));
+      expect(e.load.today, isNull);
+      expect(e.load.total, 73.8);
+
+      final allNull = Snapshot.fromRow({'ts': 1, 'pv_today_kwh': null, 'load_total_kwh': null})!;
+      expect(allNull.energy.isEmpty, isTrue);
     });
 
     test('new snapshot columns are read', () {
@@ -132,20 +156,40 @@ void main() {
       final st = WorkerState.fromRows([
         {'key': 'battery_capacity_kwh', 'value': '10.24'},
         {'key': 'started_ts', 'value': 'garbage'},
-        {'key': 'battery_sign', 'value': 'charge_negative'},
       ]);
       expect(st.batteryCapacityKwh, 10.24);
       expect(st.startedTs, isNull);
-      expect(st.batterySign, BatterySign.chargeNegative);
-      expect(WorkerState.empty.batterySign, isNull);
     });
 
-    test('battery direction needs a known sign', () {
-      expect(batteryDirection(-400, null), isNull);
-      expect(batteryDirection(-400, BatterySign.chargeNegative), BatteryDirection.charging);
-      expect(batteryDirection(-400, BatterySign.chargePositive), BatteryDirection.discharging);
-      expect(batteryDirection(3, BatterySign.chargePositive), BatteryDirection.idle);
-      expect(batteryDirection(null, BatterySign.chargePositive), isNull);
+    test('battery direction comes from the status code, not the batPower sign', () {
+      Snapshot snap(int? status, double? w) => Snapshot(ts: 0, status: status, batteryW: w);
+
+      final discharging = BatteryFlow.of(snap(2, 318));
+      expect(discharging.direction, BatteryDirection.discharging);
+      expect(discharging.dischargeW, 318);
+      expect(discharging.chargeW, 0);
+      expect(formatBatteryFlow(discharging), 'Discharging 318 W');
+
+      final charging = BatteryFlow.of(snap(10, 120));
+      expect(charging.direction, BatteryDirection.charging);
+      expect(charging.chargeW, 120);
+      expect(charging.dischargeW, 0);
+      expect(formatBatteryFlow(charging), 'Charging 120 W');
+
+      for (final code in [5, 6, 7, 8, 9, 10]) {
+        expect(batteryDirection(code), BatteryDirection.charging);
+      }
+      for (final code in [0, 1, 3, 4, 11, 12, 99]) {
+        expect(batteryDirection(code), isNull);
+      }
+      expect(BatteryFlow.of(snap(2, -318)).dischargeW, 318);
+
+      final unknown = BatteryFlow.of(snap(null, 318));
+      expect(unknown.direction, isNull);
+      expect(unknown.chargeW, isNull);
+      expect(unknown.dischargeW, isNull);
+      expect(formatBatteryFlow(unknown), isNull);
+      expect(BatteryFlow.of(null).direction, isNull);
     });
 
     test('status codes map to SPF names', () {
@@ -155,10 +199,13 @@ void main() {
       expect(statusName(null), isNull);
     });
 
-    test('runtime needs SOC, capacity and a positive load', () {
-      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 1000), 5);
-      expect(runtimeHours(soc: 50, capacityKwh: null, loadW: 1000), isNull);
-      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 0), isNull);
+    test('runtime needs SOC, capacity, a positive load and a battery that is not charging', () {
+      const d = BatteryDirection.discharging;
+      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 1000, direction: d), 5);
+      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 1000, direction: BatteryDirection.charging), isNull);
+      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 1000), isNull);
+      expect(runtimeHours(soc: 50, capacityKwh: null, loadW: 1000, direction: d), isNull);
+      expect(runtimeHours(soc: 50, capacityKwh: 10, loadW: 0, direction: d), isNull);
     });
   });
 
